@@ -14,6 +14,20 @@
   );
 
   const meta = document.getElementById("meta-info");
+  const refreshBtn = document.getElementById("refresh-live-btn");
+
+  // Fragmento fijo del indicador (parche + fecha de datos), reutilizado por
+  // el arranque y por el refresco manual para no repetir la plantilla.
+  const metaBase = () => `Parche ${DATA.raw.meta.current_patch} · datos del ${DATA.raw.meta.data_updated}`;
+
+  // Re-renderiza las vistas cuyo contenido depende de precios UEX / marketplace
+  // (mismo conjunto tanto en la carga inicial como en el refresco manual).
+  const rerenderLiveViews = () => {
+    Finder.renderList(document.getElementById("ore-search").value.trim().toLowerCase());
+    if (Finder.selected) Finder.renderDetail(Finder.selected);
+    if (Locations.selected) Locations.renderDetail(Locations.selected);
+    Inventory.render();
+  };
 
   try {
     await DATA.load();
@@ -27,7 +41,7 @@
     return;
   }
 
-  meta.textContent = `Parche ${DATA.raw.meta.current_patch} · datos del ${DATA.raw.meta.data_updated} · precios UEX: cargando…`;
+  meta.textContent = `${metaBase()} · precios UEX: cargando…`;
 
   Finder.init();
   Locations.init();
@@ -37,14 +51,10 @@
   // Precios en vivo, sin bloquear la interfaz
   try {
     await DATA.loadUexPrices();
-    meta.textContent = `Parche ${DATA.raw.meta.current_patch} · datos del ${DATA.raw.meta.data_updated} · precios UEX en vivo ✓`;
-    // refrescar vistas que muestran precios
-    Finder.renderList(document.getElementById("ore-search").value.trim().toLowerCase());
-    if (Finder.selected) Finder.renderDetail(Finder.selected);
-    if (Locations.selected) Locations.renderDetail(Locations.selected);
-    Inventory.render();
+    meta.textContent = `${metaBase()} · precios UEX en vivo ✓`;
+    rerenderLiveViews();
   } catch (err) {
-    meta.textContent = `Parche ${DATA.raw.meta.current_patch} · datos del ${DATA.raw.meta.data_updated} · precios UEX no disponibles`;
+    meta.textContent = `${metaBase()} · precios UEX no disponibles`;
     console.warn("UEX no disponible:", err);
   }
 
@@ -55,4 +65,34 @@
   } catch (err) {
     console.warn("Marketplace UEX no disponible:", err);
   }
+
+  // Botón "Actualizar": refresco manual forzado de precios + marketplace,
+  // saltando la caché de 30 min. DATA.refreshLive() nunca rechaza (ver
+  // contrato en data.js), así que no hace falta try/catch aquí.
+  refreshBtn.addEventListener("click", async () => {
+    refreshBtn.disabled = true;
+    const prevLabel = refreshBtn.textContent;
+    refreshBtn.textContent = "Actualizando…";
+
+    const r = await DATA.refreshLive();
+    rerenderLiveViews();
+
+    const time = new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+    if (r.prices === "ok" && r.marketplace === "ok") {
+      meta.textContent = `${metaBase()} · precios UEX en vivo ✓ · actualizado a las ${time}`;
+      showToast(`Precios actualizados (${time})`);
+    } else if (r.prices === "ok" && r.marketplace === "error") {
+      meta.textContent = `${metaBase()} · precios actualizados ✓ · marketplace no disponible`;
+      showToast("Precios actualizados; marketplace no disponible");
+    } else if (r.prices === "error" && r.marketplace === "ok") {
+      meta.textContent = `${metaBase()} · marketplace actualizado ✓ · precios no disponibles`;
+      showToast("Marketplace actualizado; precios no disponibles");
+    } else {
+      meta.textContent = `${metaBase()} · no se pudo conectar con UEX`;
+      showToast("No se pudo conectar con UEX; se mantienen los últimos datos");
+    }
+
+    refreshBtn.disabled = false;
+    refreshBtn.textContent = prevLabel;
+  });
 })();

@@ -99,6 +99,16 @@ def main():
     check("data.js: loadMarketplaceAverages definido", "loadMarketplaceAverages" in data_js)
     check("data.js: marketplaceAvgFor definido", "marketplaceAvgFor" in data_js)
     check("data.js: QUALITY_TIER_LABELS definido", "QUALITY_TIER_LABELS" in data_js)
+
+    # --- refresco manual forzado (salta la cache de 30 min) -------------
+    check("data.js: refreshLive definido", "refreshLive" in data_js)
+    check("data.js: refreshLive usa Promise.allSettled (un fallo no tumba al otro)",
+          re.search(r"refreshLive[\s\S]{0,400}Promise\.allSettled", data_js) is not None)
+    check("data.js: loadUexPrices acepta force", re.search(r"loadUexPrices\(force", data_js) is not None)
+    check("data.js: loadMarketplaceAverages acepta force",
+          re.search(r"loadMarketplaceAverages\(force", data_js) is not None)
+    check("uex.js: commodities/marketplaceAveragesAll aceptan force (para saltar cache)",
+          "force" in uex_js)
     # tabla de tramos verificada empiricamente (uexcorp.space/marketplace/averages):
     # no es floor(quality/100) — proteger contra una "correccion" a ciegas.
     m = re.search(r"QUALITY_TIER_LABELS\s*=\s*\{(.*?)\}", data_js, re.S)

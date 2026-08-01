@@ -7,15 +7,21 @@ const UEX = (() => {
   const CACHE_PREFIX = "mineriasc_uex_";
   const TTL_MS = 30 * 60 * 1000; // 30 minutos
 
-  async function get(resource, params = {}) {
+  // `force`: salta la lectura de caché (para refrescos manuales desde la UI).
+  // No borra la entrada previa antes de tener éxito: si el fetch falla, la
+  // caché vieja (aunque caducada) queda intacta y la app sigue sirviendo esos
+  // datos — nunca se degrada peor que un arranque sin refresco.
+  async function get(resource, params = {}, force = false) {
     const query = new URLSearchParams(params).toString();
     const url = `${BASE}/${resource}${query ? "?" + query : ""}`;
     const cacheKey = CACHE_PREFIX + resource + ":" + query;
 
-    try {
-      const cached = JSON.parse(localStorage.getItem(cacheKey));
-      if (cached && Date.now() - cached.t < TTL_MS) return cached.data;
-    } catch (_) { /* caché corrupta: se ignora */ }
+    if (!force) {
+      try {
+        const cached = JSON.parse(localStorage.getItem(cacheKey));
+        if (cached && Date.now() - cached.t < TTL_MS) return cached.data;
+      } catch (_) { /* caché corrupta: se ignora */ }
+    }
 
     const res = await fetch(url);
     if (!res.ok) throw new Error(`UEX ${resource}: HTTP ${res.status}`);
@@ -29,7 +35,7 @@ const UEX = (() => {
   }
 
   // Todas las commodities (precios medios de compra/venta incluidos)
-  const commodities = () => get("commodities");
+  const commodities = (force = false) => get("commodities", {}, force);
 
   // Precios por terminal de una commodity concreta (refinada)
   const commodityPrices = (idCommodity) =>
@@ -49,14 +55,18 @@ const UEX = (() => {
   // ANTES de cachear (reduce a ~40 KB) para no agotar la cuota de
   // localStorage. No reutiliza get(): ese helper cachea la respuesta tal
   // cual llega, y aquí necesitamos guardar solo el subconjunto filtrado.
-  const marketplaceAveragesAll = async () => {
+  // `force`: mismo contrato que en get() — salta la lectura de caché pero solo
+  // la sobrescribe si el fetch tiene éxito.
+  const marketplaceAveragesAll = async (force = false) => {
     const resource = "marketplace_prices_averages_all";
     const cacheKey = CACHE_PREFIX + resource + ":unit=scu&operation=sell";
 
-    try {
-      const cached = JSON.parse(localStorage.getItem(cacheKey));
-      if (cached && Date.now() - cached.t < TTL_MS) return cached.data;
-    } catch (_) { /* caché corrupta: se ignora */ }
+    if (!force) {
+      try {
+        const cached = JSON.parse(localStorage.getItem(cacheKey));
+        if (cached && Date.now() - cached.t < TTL_MS) return cached.data;
+      } catch (_) { /* caché corrupta: se ignora */ }
+    }
 
     const res = await fetch(`${BASE}/${resource}`);
     if (!res.ok) throw new Error(`UEX ${resource}: HTTP ${res.status}`);

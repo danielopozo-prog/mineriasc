@@ -14,6 +14,7 @@ const DATA = {
   uexReady: false,
   marketplaceByBase: {}, // nombre base normalizado (minúsculas) -> [fila averages, ...]
   marketplaceReady: false,
+  _refreshInFlight: null, // promesa del refreshLive() en curso, para deduplicar clicks
 
   async load() {
     const res = await fetch("data/mining_data.json");
@@ -57,9 +58,14 @@ const DATA = {
     }
   },
 
-  // Precios UEX: se cargan aparte para que la app funcione aunque la API falle
-  async loadUexPrices() {
-    const list = await UEX.commodities();
+  // Precios UEX: se cargan aparte para que la app funcione aunque la API falle.
+  // `force` (para refrescos manuales) salta la caché de 30 min de UEX.commodities.
+  async loadUexPrices(force = false) {
+    const list = await UEX.commodities(force);
+    // Reconstruir desde cero SOLO tras un fetch con éxito (ver misma razón en
+    // loadMarketplaceAverages): si se limpiara antes del await y la petición
+    // fallara, un refresco forzado borraría precios buenos ya cargados.
+    this.uexByName = {};
     for (const c of list) {
       this.uexByName[c.name.toLowerCase()] = c;
     }
@@ -99,9 +105,13 @@ const DATA = {
   // Medias del Marketplace P2P (jugador-a-jugador): se cargan aparte, igual que
   // loadUexPrices, para que la app funcione aunque la API falle. No se auto-protege
   // con try/catch (mismo patrón que loadUexPrices): quien la llama decide cómo
-  // degradar — ver app.js.
-  async loadMarketplaceAverages() {
-    const rows = await UEX.marketplaceAveragesAll();
+  // degradar — ver app.js. `force` (para refrescos manuales) salta la caché.
+  async loadMarketplaceAverages(force = false) {
+    const rows = await UEX.marketplaceAveragesAll(force);
+    // Reconstruir desde cero SOLO tras un fetch con éxito: si se limpiara antes
+    // del await y la petición fallara, un refresco forzado borraría el índice
+    // bueno ya cargado y dejaría la app peor que antes de refrescar.
+    this.marketplaceByBase = {};
     for (const r of rows) {
       const key = (r.item_name || "").toLowerCase();
       if (!key) continue;
@@ -111,6 +121,46 @@ const DATA = {
       list.sort((a, b) => a.quality_tier - b.quality_tier);
     }
     this.marketplaceReady = true;
+  },
+
+  // Refresco manual forzado de los dos datasets en vivo (precios de commodities
+  // + medias del Marketplace P2P), saltando la caché de 30 min de localStorage.
+  // Uso desde la UI: `await DATA.refreshLive()`.
+  //
+  // Contrato:
+  // - Devuelve SIEMPRE (nunca rechaza) un objeto:
+  //     { prices: "ok"|"error", marketplace: "ok"|"error",
+  //       errors: { prices: Error|null, marketplace: Error|null } }
+  // - Éxito total: ambas "ok". Éxito parcial: una "ok" y otra "error" (la que
+  //   falló conserva sus datos previos — ver loadUexPrices/loadMarketplaceAverages,
+  //   solo se sobrescribe el índice tras un fetch exitoso). Fallo total: ambas
+  //   "error", la app queda exactamente como estaba antes de pulsar refrescar.
+  // - Las dos peticiones van en paralelo con Promise.allSettled: un fallo en una
+  //   no cancela ni ensucia la otra.
+  // - Si ya hay un refresco en curso, se reutiliza su promesa (no dispara una
+  //   ráfaga nueva de peticiones por clicks repetidos).
+  async refreshLive() {
+    if (this._refreshInFlight) return this._refreshInFlight;
+
+    const run = async () => {
+      const [pricesResult, marketResult] = await Promise.allSettled([
+        this.loadUexPrices(true),
+        this.loadMarketplaceAverages(true),
+      ]);
+      return {
+        prices: pricesResult.status === "fulfilled" ? "ok" : "error",
+        marketplace: marketResult.status === "fulfilled" ? "ok" : "error",
+        errors: {
+          prices: pricesResult.status === "rejected" ? pricesResult.reason : null,
+          marketplace: marketResult.status === "rejected" ? marketResult.reason : null,
+        },
+      };
+    };
+
+    this._refreshInFlight = run().finally(() => {
+      this._refreshInFlight = null;
+    });
+    return this._refreshInFlight;
   },
 
   // Medias del Marketplace P2P del mineral en bruto, un tramo de calidad por fila,

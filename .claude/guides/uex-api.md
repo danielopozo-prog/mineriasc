@@ -79,6 +79,34 @@ Consumo en `DATA`: `loadMarketplaceAverages()` (llenar índice) + `marketplaceAv
 - Respuesta estándar: `{status: "ok", data: [...]}`. Comprobar `status`, no solo el
   HTTP.
 
+## Refresco manual forzado (`DATA.refreshLive()`)
+
+La UI puede forzar datos frescos saltando el TTL de 30 min de `localStorage`
+(botón "refrescar precios" o similar). Contrato:
+
+- `js/uex.js`: `get()` y `marketplaceAveragesAll()` aceptan un flag `force` que
+  salta la **lectura** de caché, pero la entrada solo se **sobrescribe** tras un
+  fetch con éxito. Si el fetch falla, la caché vieja (aunque caducada) queda
+  intacta — nunca se borra por adelantado. `UEX.commodities(force)` y
+  `UEX.marketplaceAveragesAll(force)` exponen ese flag.
+- `js/data.js`: `loadUexPrices(force)` y `loadMarketplaceAverages(force)` pasan
+  el flag a `UEX` y, igual que la caché, solo reconstruyen su índice
+  (`uexByName` / `marketplaceByBase`) **después** de que el fetch resuelva —
+  nunca antes del `await`. Un refresco que falla deja la app exactamente como
+  estaba, nunca peor.
+- `DATA.refreshLive()` es el punto de entrada único para la UI: dispara ambas
+  cargas en paralelo con `Promise.allSettled` (un fallo no tumba a la otra) y
+  deduplica clicks repetidos reutilizando la promesa en curso
+  (`this._refreshInFlight`) en vez de disparar ráfagas nuevas de peticiones.
+  Devuelve siempre (nunca rechaza):
+  ```js
+  { prices: "ok"|"error", marketplace: "ok"|"error",
+    errors: { prices: Error|null, marketplace: Error|null } }
+  ```
+  Éxito parcial = una fuente "ok" y otra "error" (la que falló conserva sus
+  datos previos). No usar para refrescos automáticos/polling: es para una
+  acción explícita del usuario, dentro del límite de 120 peticiones/min de UEX.
+
 ## Qué más ofrece la API (no usado aún)
 
 `refineries_yields`, `refineries_capacities`, rutas de comercio, vehículos, terminales

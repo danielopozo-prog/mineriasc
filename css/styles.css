@@ -120,6 +120,9 @@ body {
   letter-spacing: -0.3px;
 }
 .brand-sub { font-size: 0.75rem; color: var(--text-dim); }
+.meta-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.refresh-btn { padding: 3px 10px; font-size: 0.68rem; letter-spacing: 0.3px; }
+.refresh-btn:disabled { opacity: 0.55; cursor: wait; filter: none; }
 
 .tabs { display: flex; gap: 6px; }
 .tab {
