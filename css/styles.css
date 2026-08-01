@@ -567,8 +567,16 @@ footer a { color: var(--info); text-decoration: none; }
 
 .mult-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 8px;
+}
+/* ×1..5: el grupo protagonista, tarjetas grandes en fila/bloque superior. */
+.mult-grid-main {
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+}
+/* ×6..15: mismo dato, tarjetas compactas debajo — jerarquía de un vistazo. */
+.mult-grid-rest {
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 6px;
 }
 .mult-card {
   background: var(--bg-alt);
@@ -576,6 +584,9 @@ footer a { color: var(--info); text-decoration: none; }
   border-radius: var(--radius-sm);
   padding: 8px 6px;
   text-align: center;
+}
+.mult-grid-rest .mult-card {
+  padding: 5px 4px;
 }
 .mult-label {
   font-family: var(--font-ui);
@@ -585,6 +596,9 @@ footer a { color: var(--info); text-decoration: none; }
   text-transform: uppercase;
   color: var(--accent-2);
 }
+.mult-grid-rest .mult-label {
+  font-size: 0.6rem;
+}
 .mult-value {
   font-family: var(--font-display);
   font-size: 2.1rem;
@@ -593,14 +607,41 @@ footer a { color: var(--info); text-decoration: none; }
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+.mult-grid-rest .mult-value {
+  font-size: 1.05rem;
+}
+/* Separador sutil entre el grupo grande (×1-5) y el compacto (×6-15). */
+.mult-sep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 6px;
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.mult-sep::before,
+.mult-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-muted);
+}
 @media (min-width: 700px) {
   .mult-value { font-size: 2.4rem; }
+  .mult-grid-rest .mult-value { font-size: 1.2rem; }
 }
 @media (min-width: 1100px) {
-  .mult-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-  .mult-card { padding: 14px 10px; }
-  .mult-label { font-size: 0.85rem; }
+  .mult-grid-main { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .mult-grid-rest { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+  .mult-grid-main .mult-card { padding: 14px 10px; }
+  .mult-grid-main .mult-label { font-size: 0.85rem; }
   .mult-value { font-size: 3.2rem; }
+  .mult-grid-rest .mult-value { font-size: 1.6rem; }
+  .mult-grid-rest .mult-label { font-size: 0.7rem; }
   .sig-hit-value { font-size: 2.6rem; }
   .sig-hit-ore { font-size: 1.5rem; }
 }

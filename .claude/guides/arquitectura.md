@@ -52,8 +52,13 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
 - Los listados laterales (`.side-item`) se regeneran enteros en cada render y
   re-atachan sus listeners; no hay delegación de eventos.
 - Pestaña Señales (`js/signals.js`): además de la tabla de múltiplos por
-  mineral (ahora ×1…×15, tarjetas más grandes en escritorio ancho ≥1100px
-  vía media query en `css/styles.css`), tiene dos añadidos:
+  mineral (×1…×15), tiene dos añadidos:
+  - **Jerarquía visual de múltiplos**: cada bloque de valor base separa las
+    tarjetas en dos grupos — `.mult-grid-main` (×1-5, cifra grande,
+    protagonista) y `.mult-grid-rest` (×6-15, cifra ~mitad de tamaño,
+    compacta), con un separador sutil `.mult-sep` entre ambos. El tamaño de
+    cifra escala junto con la media query de `css/styles.css` (base móvil,
+    ≥700px, ≥1100px) manteniendo siempre la proporción ~2:1 entre grupos.
   - **Búsqueda inversa** (`#sig-reverse-input` → `Signals.renderReverse`):
     el jugador teclea la cifra que le muestra el escáner (acepta puntos de
     miles, se limpia con un regex a solo dígitos) y la vista calcula, para

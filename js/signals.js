@@ -171,13 +171,23 @@ const Signals = {
         const tierLabel = [...g.tiers].join(" / ");
         const contextLabel = [...g.contexts].map((c) => SIGNAL_CONTEXT_ES[c] || c).join(" · ");
 
-        const cards = Array.from({ length: SIGNAL_MULTIPLIERS }, (_, i) => i + 1)
-          .map(
-            (m) => `<div class="mult-card">
+        // Dos niveles: ×1..5 (los que más se usan al leer el escáner) en
+        // tarjetas grandes, ×6..15 debajo en tarjetas compactas — misma
+        // información, jerarquía visual clara de un vistazo.
+        const MAIN_MULTIPLIERS = 5;
+        const cardHtml = (m) => `<div class="mult-card">
               <div class="mult-label">×${m}</div>
               <div class="mult-value">${fmtNum(g.value * m)}</div>
-            </div>`
-          )
+            </div>`;
+
+        const mainCards = Array.from({ length: MAIN_MULTIPLIERS }, (_, i) => i + 1)
+          .map(cardHtml)
+          .join("");
+        const restCards = Array.from(
+          { length: SIGNAL_MULTIPLIERS - MAIN_MULTIPLIERS },
+          (_, i) => i + MAIN_MULTIPLIERS + 1
+        )
+          .map(cardHtml)
           .join("");
 
         return `
@@ -187,7 +197,9 @@ const Signals = {
               <span class="hint">${esc(contextLabel)}</span>
               <span class="signal-base">Base: <b>${fmtNum(g.value)}</b></span>
             </div>
-            <div class="mult-grid">${cards}</div>
+            <div class="mult-grid mult-grid-main">${mainCards}</div>
+            <div class="mult-sep"><span>×${MAIN_MULTIPLIERS + 1} – ×${SIGNAL_MULTIPLIERS}</span></div>
+            <div class="mult-grid mult-grid-rest">${restCards}</div>
           </div>`;
       })
       .join("");
