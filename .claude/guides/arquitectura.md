@@ -134,6 +134,23 @@ móvil aunque el cambio sea de escritorio. Pasa ambos juntos (`--width 1900 --he
 950`) para aplicar `Emulation.setDeviceMetricsOverride` antes de navegar; si se omiten
 los dos, el comportamiento es idéntico al de antes de este flag.
 
+**Orden real de ejecución, no el de la línea de comandos**: el script siempre resuelve
+`--wait` primero y solo *después* corre todos los `--eval`, sin importar en qué orden
+los intercalaste al invocarlo. Si la condición de `--wait` depende de una acción que tú
+mismo disparas con un `--eval` (p. ej. un clic de pestaña que dispara un `fetch`), ese
+`--eval` todavía no se ha ejecutado cuando el `--wait` empieza a hacer polling, así que
+nunca se cumple. Solución: mete el clic y el polling en un único `--eval` async:
+
+```bash
+python .claude/scripts/browser_check.py --path index.html \
+  --eval "(async () => { document.querySelector('[data-tab=\"refineria\"]').click();
+    const t0 = Date.now();
+    while (Date.now() - t0 < 12000 && !document.querySelector('#refinery-methods .stars')) {
+      await new Promise(r => setTimeout(r, 200));
+    }
+    return document.querySelectorAll('#refinery-methods .stars').length; })()"
+```
+
 Ejemplo real (usado para verificar que `marketplaceAveragesAll` sirve datos):
 
 ```bash
