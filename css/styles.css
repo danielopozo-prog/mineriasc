@@ -65,6 +65,8 @@
   --good: #4cd97b;
   --bad: #ff8a5c;
   --info: #4da3ff;
+  --star-on: #ff6a3d;
+  --star-off: #5c2530;
   --radius: 8px;
   --radius-sm: 6px;
   --font-display: "Teko", "Saira Condensed", "Segoe UI", system-ui, sans-serif;
@@ -251,6 +253,11 @@ input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(
 .fav-star:hover { color: var(--accent-2); }
 .fav-star.active { color: var(--accent-2); }
 .fav-star-lg { font-size: 1.6rem; }
+
+/* ---------- Estrellas de puntuación (Refinería) ---------- */
+.stars { letter-spacing: 1px; font-size: 1rem; }
+.stars .star-on { color: var(--star-on); }
+.stars .star-off { color: var(--star-off); }
 
 .detail-head-row {
   display: flex;

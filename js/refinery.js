@@ -16,14 +16,24 @@ const Refinery = {
     box.innerHTML = '<p class="loading">Cargando métodos de refinado…</p>';
     try {
       const methods = await UEX.refineryMethods();
-      const stars = (n) => "★".repeat(n || 0) + "☆".repeat(Math.max(0, 3 - (n || 0)));
+      const stars = (n) => {
+        n = n || 0;
+        let out = "";
+        for (let i = 1; i <= 3; i++) {
+          out +=
+            i <= n
+              ? '<span class="star star-on">★</span>'
+              : '<span class="star star-off">☆</span>';
+        }
+        return out;
+      };
       box.innerHTML = methods
         .map(
           (m) => `<div class="card">
             <h5>${esc(m.name)}</h5>
-            <div class="row"><span>Rendimiento</span><b title="${m.rating_yield}/3">${stars(m.rating_yield)}</b></div>
-            <div class="row"><span>Coste</span><b title="${m.rating_cost}/3">${stars(m.rating_cost)}</b></div>
-            <div class="row"><span>Velocidad</span><b title="${m.rating_speed}/3">${stars(m.rating_speed)}</b></div>
+            <div class="row"><span>Rendimiento</span><b class="stars" title="${m.rating_yield}/3">${stars(m.rating_yield)}</b></div>
+            <div class="row"><span>Coste</span><b class="stars" title="${m.rating_cost}/3">${stars(m.rating_cost)}</b></div>
+            <div class="row"><span>Velocidad</span><b class="stars" title="${m.rating_speed}/3">${stars(m.rating_speed)}</b></div>
           </div>`
         )
         .join("");
