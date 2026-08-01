@@ -535,6 +535,7 @@ footer a { color: var(--info); text-decoration: none; }
 }
 .sig-hit:hover { background: var(--panel-hover); }
 .sig-hit.favorite { border-color: var(--accent-2); }
+.sig-hit.selected { background: var(--accent-soft); }
 .sig-hit-body { flex: 1; min-width: 0; }
 .sig-hit-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .sig-hit-ore {
@@ -553,6 +554,34 @@ footer a { color: var(--info); text-decoration: none; }
 }
 .sig-hit-dev { font-family: var(--font-ui); font-size: 0.9rem; color: var(--text-dim); }
 .sig-hit-meta { margin-top: 4px; }
+
+/* ---------- Señales de escáner: cabecera con selección múltiple ---------- */
+.sig-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ---------- Señales de escáner: varios minerales seleccionados a la vez -- */
+.sig-multi-hint {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent-2);
+  margin-bottom: 12px;
+}
+.sig-mineral-section-multi {
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 18px;
+}
+.sig-mineral-section-multi:last-child { margin-bottom: 0; }
+.detail-head-row .sig-remove-btn { margin-left: auto; }
 
 /* ---------- Señales de escáner (vista glanceable de múltiplos) ---------- */
 .signal-block {

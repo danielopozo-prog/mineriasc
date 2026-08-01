@@ -113,8 +113,12 @@
         <div class="head-title">
           <span class="kicker">Star Citizen · Escáner</span>
           <h2>Señales de escáner</h2>
+          <span class="hint">Selecciona uno o varios minerales para comparar sus múltiplos</span>
         </div>
-        <input type="search" id="sig-search" placeholder="Busca un mineral… (ej. Aslarite)" autocomplete="off">
+        <div class="sig-head-actions">
+          <input type="search" id="sig-search" placeholder="Busca un mineral… (ej. Aslarite)" autocomplete="off">
+          <button type="button" id="sig-clear-selection" class="btn small" hidden>Limpiar selección</button>
+        </div>
       </div>
       <div class="sig-reverse">
         <label for="sig-reverse-input" class="sig-reverse-label">¿Qué señal te sale?</label>
@@ -124,7 +128,7 @@
       <div class="split">
         <aside id="sig-list" class="side-list"></aside>
         <div id="sig-detail" class="detail">
-          <p class="placeholder">Selecciona un mineral para ver sus múltiplos de señal, de un vistazo.</p>
+          <p class="placeholder">Selecciona uno o varios minerales con señales de escáner.</p>
         </div>
       </div>
     </section>

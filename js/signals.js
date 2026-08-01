@@ -3,10 +3,18 @@
    vistazo mientras se juega. Datos: DATA.scannerSignals / oreToSignals
    (no se tocan; aquí solo se deduplican y traducen para la vista).
 
+   Selección múltiple: se puede tener varios minerales activos a la vez
+   (clic = alternar en la selección, no reemplazarla). Con 1 seleccionado
+   la ficha se ve igual que siempre; con varios, se apilan una sección
+   por mineral, cada una con su propio cabecero y botón para quitarla.
+   La selección vive solo en memoria (this.selected, un Set) — no se
+   persiste entre sesiones, igual que antes de este cambio.
+
    Incluye también:
    - Búsqueda inversa: el jugador teclea la cifra que le muestra el
      escáner y la vista le dice qué mineral y qué múltiplo es (exacto o
-     el más cercano).
+     el más cercano). Un clic en un resultado también alterna su
+     selección.
    - Favoritos de mineral, persistidos en localStorage, que se muestran
      agrupados arriba de la lista y se priorizan en la búsqueda inversa. */
 
@@ -21,7 +29,7 @@ const SIGNAL_MULTIPLIERS = 15;
 const FAVORITES_KEY = "mineriasc_favorites";
 
 const Signals = {
-  selected: null,
+  selected: new Set(),
   favorites: [],
 
   init() {
@@ -33,9 +41,14 @@ const Signals = {
     document.getElementById("sig-reverse-input").addEventListener("input", (e) => {
       this.renderReverse(e.target.value);
     });
+    document.getElementById("sig-clear-selection").addEventListener("click", () => {
+      this.clearSelection();
+    });
 
     this.renderList("");
     this.renderReverse("");
+    this.renderDetail();
+    this.updateClearButton();
   },
 
   /* ---------- Favoritos (localStorage) ---------- */
@@ -67,7 +80,7 @@ const Signals = {
 
     this.renderList(document.getElementById("sig-search").value.trim().toLowerCase());
     this.renderReverse(document.getElementById("sig-reverse-input").value);
-    if (this.selected) this.renderDetail(this.selected);
+    this.renderDetail();
   },
 
   favStarHtml(oreKey, extraClass = "") {
@@ -102,7 +115,7 @@ const Signals = {
 
     const renderItem = ({ key, ore }) => {
       const n = DATA.oreToSignals[key].length;
-      return `<div class="side-item ${key === this.selected ? "active" : ""}" data-ore="${esc(key)}">
+      return `<div class="side-item ${this.selected.has(key) ? "active" : ""}" data-ore="${esc(key)}">
         ${this.favStarHtml(key)}
         <span class="side-item-name">${esc(ore.display_name)}</span>
         <span class="sub">${n} señal${n === 1 ? "" : "es"}</span>
@@ -124,7 +137,7 @@ const Signals = {
     container.innerHTML = html || '<p class="placeholder">Sin resultados.</p>';
 
     container.querySelectorAll(".side-item").forEach((el) =>
-      el.addEventListener("click", () => this.select(el.dataset.ore))
+      el.addEventListener("click", () => this.toggleSelect(el.dataset.ore))
     );
     this.attachFavStarListeners(container);
   },
@@ -147,33 +160,48 @@ const Signals = {
     return [...groups.values()].sort((a, b) => b.value - a.value);
   },
 
-  select(oreKey) {
-    this.selected = oreKey;
+  /* ---------- Selección múltiple ---------- */
+
+  toggleSelect(oreKey) {
+    if (this.selected.has(oreKey)) {
+      this.selected.delete(oreKey);
+    } else {
+      this.selected.add(oreKey);
+    }
     this.renderList(document.getElementById("sig-search").value.trim().toLowerCase());
-    this.renderDetail(oreKey);
+    this.renderReverse(document.getElementById("sig-reverse-input").value);
+    this.renderDetail();
+    this.updateClearButton();
   },
 
-  renderDetail(oreKey) {
-    const ore = DATA.ores[oreKey];
-    const el = document.getElementById("sig-detail");
-    const sigs = DATA.oreToSignals[oreKey] || [];
+  clearSelection() {
+    if (!this.selected.size) return;
+    this.selected.clear();
+    this.renderList(document.getElementById("sig-search").value.trim().toLowerCase());
+    this.renderReverse(document.getElementById("sig-reverse-input").value);
+    this.renderDetail();
+    this.updateClearButton();
+  },
 
-    if (!ore || !sigs.length) {
-      el.innerHTML = '<p class="placeholder">Selecciona un mineral con señales de escáner.</p>';
-      return;
-    }
+  updateClearButton() {
+    const btn = document.getElementById("sig-clear-selection");
+    if (!btn) return;
+    const n = this.selected.size;
+    btn.hidden = n === 0;
+    btn.textContent = n > 1 ? `Limpiar selección (${n})` : "Limpiar selección";
+  },
 
-    const groups = this.groupSignals(sigs);
-
-    const blocks = groups
+  // Tarjetas de múltiplos (×1..15) de un grupo de señales (mismo valor
+  // base). Dos niveles: ×1..5 grandes, ×6..15 compactos debajo — misma
+  // información, jerarquía visual clara de un vistazo. Extraído para
+  // poder repetirse una vez por mineral cuando hay varios seleccionados.
+  blocksHtml(groups) {
+    return groups
       .map((g) => {
         const mainTier = [...g.tiers][0];
         const tierLabel = [...g.tiers].join(" / ");
         const contextLabel = [...g.contexts].map((c) => SIGNAL_CONTEXT_ES[c] || c).join(" · ");
 
-        // Dos niveles: ×1..5 (los que más se usan al leer el escáner) en
-        // tarjetas grandes, ×6..15 debajo en tarjetas compactas — misma
-        // información, jerarquía visual clara de un vistazo.
         const MAIN_MULTIPLIERS = 5;
         const cardHtml = (m) => `<div class="mult-card">
               <div class="mult-label">×${m}</div>
@@ -203,17 +231,56 @@ const Signals = {
           </div>`;
       })
       .join("");
+  },
 
-    el.innerHTML = `
-      <div class="detail-head-row">
-        <h3>${esc(ore.display_name)}</h3>
-        ${this.favStarHtml(oreKey, "fav-star-lg")}
-      </div>
-      <p class="subtitle">Señal de escáner · ${groups.length} valor${groups.length === 1 ? "" : "es"} distinto${groups.length === 1 ? "" : "s"}</p>
-      ${blocks}
-    `;
+  // Ficha completa de un mineral (cabecero + bloques de múltiplos). En
+  // modo `multi` añade un botón para quitarlo de la selección — en modo
+  // simple la ficha queda igual que antes de tener multiselección.
+  renderOreSection(oreKey, ore, multi) {
+    const sigs = DATA.oreToSignals[oreKey] || [];
+    const groups = this.groupSignals(sigs);
+    const removeBtn = multi
+      ? `<button type="button" class="btn small danger sig-remove-btn" data-ore="${esc(oreKey)}" title="Quitar de la selección">Quitar</button>`
+      : "";
+
+    return `
+      <div class="sig-mineral-section ${multi ? "sig-mineral-section-multi" : ""}">
+        <div class="detail-head-row">
+          <h3>${esc(ore.display_name)}</h3>
+          ${this.favStarHtml(oreKey, "fav-star-lg")}
+          ${removeBtn}
+        </div>
+        <p class="subtitle">Señal de escáner · ${groups.length} valor${groups.length === 1 ? "" : "es"} distinto${groups.length === 1 ? "" : "s"}</p>
+        ${this.blocksHtml(groups)}
+      </div>`;
+  },
+
+  renderDetail() {
+    const el = document.getElementById("sig-detail");
+    const entries = [...this.selected]
+      .filter((key) => DATA.ores[key] && (DATA.oreToSignals[key] || []).length)
+      .map((key) => ({ key, ore: DATA.ores[key] }))
+      .sort((a, b) => a.ore.display_name.localeCompare(b.ore.display_name));
+
+    if (!entries.length) {
+      el.innerHTML = '<p class="placeholder">Selecciona uno o varios minerales con señales de escáner.</p>';
+      return;
+    }
+
+    if (entries.length === 1) {
+      el.innerHTML = this.renderOreSection(entries[0].key, entries[0].ore, false);
+    } else {
+      const head = `<div class="sig-multi-hint">${entries.length} minerales seleccionados — comparando sus múltiplos</div>`;
+      el.innerHTML = head + entries.map(({ key, ore }) => this.renderOreSection(key, ore, true)).join("");
+    }
 
     this.attachFavStarListeners(el);
+    el.querySelectorAll(".sig-remove-btn").forEach((btn) =>
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.toggleSelect(btn.dataset.ore);
+      })
+    );
   },
 
   /* ---------- Búsqueda inversa ---------- */
@@ -287,13 +354,14 @@ const Signals = {
     const rows = list
       .map((it) => {
         const fav = this.isFavorite(it.oreKey);
+        const sel = this.selected.has(it.oreKey);
         const tierLabel = it.tiers.join(" / ");
         const contextLabel = it.contexts.map((c) => SIGNAL_CONTEXT_ES[c] || c).join(" · ");
         const devLabel = exactMode
           ? ""
           : ` <span class="sig-hit-dev">(${it.diff > 0 ? "+" : ""}${fmtNum(it.diff)})</span>`;
 
-        return `<div class="sig-hit ${fav ? "favorite" : ""}" data-ore="${esc(it.oreKey)}">
+        return `<div class="sig-hit ${fav ? "favorite" : ""} ${sel ? "selected" : ""}" data-ore="${esc(it.oreKey)}">
           ${this.favStarHtml(it.oreKey)}
           <div class="sig-hit-body">
             <div class="sig-hit-top">
@@ -313,7 +381,7 @@ const Signals = {
     container.innerHTML = `<div class="sig-reverse-heading">${esc(heading)}</div>${rows}`;
 
     container.querySelectorAll(".sig-hit").forEach((el) =>
-      el.addEventListener("click", () => this.select(el.dataset.ore))
+      el.addEventListener("click", () => this.toggleSelect(el.dataset.ore))
     );
     this.attachFavStarListeners(container);
   },
