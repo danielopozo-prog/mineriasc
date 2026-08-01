@@ -88,7 +88,14 @@ def main():
 
     # el estatico sigue siendo estatico
     check("sin package.json (sin build)", not (ROOT / "package.json").exists())
-    check("sin CDNs en index.html", "cdn." not in html and "unpkg" not in html and "jsdelivr" not in html)
+    cdn_markers = ("cdn.", "unpkg", "jsdelivr", "fonts.googleapis", "fonts.gstatic")
+    check("sin CDNs en index.html", not any(m in html for m in cdn_markers))
+    css_path = ROOT / "css" / "styles.css"
+    if css_path.exists():
+        css = css_path.read_text(encoding="utf-8")
+        check("sin CDNs en css/styles.css", not any(m in css for m in cdn_markers))
+    else:
+        check("css/styles.css existe", False)
 
     print()
     if FAILS:

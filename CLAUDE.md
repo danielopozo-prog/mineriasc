@@ -76,7 +76,7 @@ Sin historial conversacional. Si falta contexto, una línea extra: `Contexto min
 
 | Zona | Agente | Dominio |
 |---|---|---|
-| `index.html`, `css/`, `js/finder.js`, `js/locations.js`, `js/refinery.js`, `js/inventory.js`, `js/app.js` | `web-ui` | Las 4 pestañas, marcado, estilos, render, interacción, exportaciones |
+| `index.html`, `css/`, `assets/`, `js/finder.js`, `js/locations.js`, `js/refinery.js`, `js/inventory.js`, `js/app.js` | `web-ui` | Las 4 pestañas, marcado, estilos, tipografía vendorizada, render, interacción, exportaciones |
 | `data/`, `js/data.js`, `js/uex.js` | `datos-uex` | mining_data.json, índices, cliente UEX, resolución de precios |
 | `README.md`, `CLAUDE.md`, `.claude/` | `web-ui` (docs de producto) / Tech Lead (capa de agentes, editada vía delegación a quien corresponda) | Documentación |
 

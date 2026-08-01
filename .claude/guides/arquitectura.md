@@ -32,6 +32,15 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
 - Utilidades globales en `data.js`: `fmtNum(n, dec)` (formato es-ES), `esc(s)` (escape
   HTML — obligatorio para todo contenido dinámico), `showToast(msg)`, y los diccionarios
   `LOC_TYPE_ES` / `METHOD_ES` (traducción de tipos y métodos).
+- Sistema visual (`css/styles.css`): tema negro casi puro (`--bg: #0a0a0a`) con acento
+  rojo carmesí (`--accent: #d81f2b`, sustituye al ámbar histórico) y acento secundario
+  naranja (`--accent-2`) para kickers de sección (`.kicker`, texto pequeño en mayúsculas
+  tipo "STAR CITIZEN · ..."). Titulares (`.brand h1`, `.panel-head h2`, `.detail h3/h4`)
+  usan `--font-display` (Teko); controles/tablas usan `--font-ui` (Saira Condensed).
+  Ambas fuentes están vendorizadas como `.woff2` en `assets/fonts/` con `@font-face` —
+  nunca CDN de Google Fonts (el gate lo comprueba en `index.html` y `css/styles.css`).
+  Los paneles `.detail` llevan esquinas HUD (pseudo-elementos `::before`/`::after` con
+  borde rojo) como detalle decorativo sutil.
 - Cada vista es un objeto literal con `init()` / `render*()`; estado en propiedades
   (`selected`, `groupBy`…). Sin clases, sin módulos ES.
 - Claves de `localStorage`: `mineriasc_inventory` (inventario) y `mineriasc_uex_*`

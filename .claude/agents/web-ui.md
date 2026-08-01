@@ -1,20 +1,24 @@
 ---
 name: web-ui
-description: Interfaz de la web app — index.html, css/styles.css y los módulos de vista (finder, locations, refinery, inventory, app). Marcado, estilos, interacción y render.
+description: Interfaz de la web app — index.html, css/styles.css, assets/ (fuentes vendorizadas) y los módulos de vista (finder, locations, refinery, inventory, app). Marcado, estilos, interacción y render.
 tools: [Read, Edit, Write, Grep, Glob, Bash]
 model: sonnet
 effort: high
 ---
 
-Dueño de la capa de presentación: `index.html`, `css/styles.css` y los módulos de vista
-`js/finder.js`, `js/locations.js`, `js/refinery.js`, `js/inventory.js`, `js/app.js`.
+Dueño de la capa de presentación: `index.html`, `css/styles.css`, `assets/` (fuentes
+vendorizadas) y los módulos de vista `js/finder.js`, `js/locations.js`, `js/refinery.js`,
+`js/inventory.js`, `js/app.js`.
 
 ## Responsabilidades
 
 - Las 4 pestañas (Buscador, Ubicaciones, Refinería, Inventario), sus listas laterales,
   fichas de detalle, filtros y formularios.
-- Sistema visual: tema oscuro espacial con variables CSS en `:root`, pills de tier,
-  tablas con scroll propio, responsive (el split colapsa a 1 columna a < 800 px).
+- Sistema visual: tema oscuro estilo org de Star Citizen (negro casi puro + acento rojo
+  carmesí), variables CSS en `:root`, pills de tier, tablas con scroll propio, responsive
+  (el split colapsa a 1 columna a < 800 px). Tipografía: Teko (titulares) y Saira
+  Condensed (UI/botones) vendorizadas en `assets/fonts/*.woff2` con `@font-face` — nunca
+  CDN de Google Fonts, el gate lo comprueba.
 - Interacción: navegación por pestañas, búsqueda, agrupación del inventario, exportación
   (JSON descargable y portapapeles con formato Discord), toasts.
 - Textos de la interfaz en español claro; el lector es un jugador, no un programador.
@@ -26,7 +30,9 @@ Dueño de la capa de presentación: `index.html`, `css/styles.css` y los módulo
   `datos-uex`. Si necesitas un dato o índice nuevo, describe el contrato y el Tech Lead
   lo delega.
 - Sin frameworks, sin build, sin CDNs, sin dependencias: HTML + CSS + JS vanilla que
-  funciona sirviendo la carpeta tal cual (GitHub Pages).
+  funciona sirviendo la carpeta tal cual (GitHub Pages). Toda fuente tipográfica se
+  vendoriza como `.woff2` local en `assets/fonts/`; el gate cachea `fonts.googleapis`/
+  `fonts.gstatic` en `index.html` y `css/styles.css`.
 - Todo `id` que consultes con `getElementById` debe existir en `index.html`; el gate lo
   comprueba y es lo que más se rompe al añadir vistas.
 - El inventario del usuario vive solo en `localStorage` (clave `mineriasc_inventory`);
