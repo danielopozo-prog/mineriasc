@@ -792,80 +792,100 @@ footer a { color: var(--info); text-decoration: none; }
   color: var(--accent);
 }
 
-.sig-loc-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-muted);
-}
-.sig-loc-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-ui);
-  font-size: 0.8rem;
-  color: var(--text-dim);
-}
 .sig-loc-swatch {
-  width: 11px;
-  height: 11px;
+  width: 10px;
+  height: 10px;
   border-radius: 3px;
   background: var(--chip-c, var(--accent-2));
   flex-shrink: 0;
 }
 
-/* Cuadrícula de chips: de 2 columnas en móvil a 10 fijas en escritorio, para
-   leer de un vistazo en qué rango cae la lectura del escáner. */
-.sig-loc-chip-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-@media (min-width: 480px) {
-  .sig-loc-chip-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-@media (min-width: 700px) {
-  .sig-loc-chip-grid { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 5px; }
-}
-
-.sig-loc-chip {
-  background: var(--bg-alt);
+/* Matriz de señales por ubicación: una fila por valor base de mineral,
+   columnas ×15..×1 fijas y alineadas entre filas. En escritorio se ve
+   entera; si no cabe, scroll horizontal dentro de .sig-loc-matrix-wrap
+   (nunca de la página) con la columna del mineral fija (sticky) para
+   no perder la referencia al desplazarse, cómodo también en móvil. */
+.sig-loc-matrix-wrap {
+  overflow-x: auto;
   border: 1px solid var(--border-muted);
-  border-left: 3px solid var(--chip-c, var(--accent-2));
   border-radius: var(--radius-sm);
-  padding: 6px 5px;
+}
+.sig-loc-matrix {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 640px;
+}
+.sig-loc-matrix th,
+.sig-loc-matrix td {
+  padding: 7px 8px;
   text-align: center;
-  cursor: pointer;
-  transition: background 0.12s;
-}
-.sig-loc-chip:hover { background: var(--panel-hover); }
-.sig-loc-chip.selected { background: var(--accent-soft); }
-.sig-loc-chip.match {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-.sig-loc-chip-value {
-  display: block;
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--text);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-muted);
 }
-.sig-loc-chip-ore {
-  display: block;
+.sig-loc-matrix thead th {
   font-family: var(--font-ui);
-  font-size: 0.6rem;
+  font-size: 0.7rem;
   color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border-strong);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.sig-loc-mineral-h {
+  text-align: left;
+  left: 0;
+  z-index: 3;
+}
+.sig-loc-mineral-cell {
+  text-align: left;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: var(--text);
+  border-left: 3px solid var(--chip-c, var(--accent-2));
   white-space: nowrap;
 }
+.sig-loc-mineral-inner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sig-loc-mineral-h,
+.sig-loc-mineral-cell {
+  position: sticky;
+  left: 0;
+  background: var(--panel);
+}
+.sig-loc-mineral-context {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+.sig-loc-row {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.sig-loc-row:hover td,
+.sig-loc-row:hover .sig-loc-mineral-cell { background: var(--panel-hover); }
+.sig-loc-row.selected td,
+.sig-loc-row.selected .sig-loc-mineral-cell { background: var(--accent-soft); }
+.sig-loc-cell {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.sig-loc-cell.match {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
 @media (min-width: 1100px) {
-  .sig-loc-chip-value { font-size: 1.2rem; }
+  .sig-loc-matrix { min-width: 0; }
+  .sig-loc-cell { font-size: 1.1rem; }
 }
