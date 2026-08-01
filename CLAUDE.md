@@ -7,12 +7,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Web app de minería para **Star Citizen** inspirada en Strata: buscador de minerales,
 explorador de ubicaciones (Stanton/Pyro/Nyx), panel de refinería e inventario personal.
 Sitio 100 % estático — HTML + CSS + JS vanilla, **sin build, sin frameworks, sin
-backend**. Datos de juego en `data/mining_data.json` (base Strata, dato generado);
-precios en vivo de la API pública de UEX Corp llamada desde el navegador; inventario del
-usuario solo en `localStorage`. Idioma del producto y de la comunicación: **español**.
+backend**. Datos de juego en `data/mining_data.json` (base Strata) y
+`data/uex_locations.json` (catálogo de estaciones/ciudades/outposts UEX) — ambos datos
+generados; precios en vivo de la API pública de UEX Corp llamada desde el navegador;
+inventario del usuario solo en `localStorage`. Idioma del producto y de la
+comunicación: **español**.
 
 Tier del proyecto: **mínimo** — 2 dominios, sin subespecialistas, sin transversales, sin
 segunda plataforma. Toda la capa de agentes vive en `.claude/`.
+
+Publicado en GitHub Pages: <https://danielopozo-prog.github.io/mineriasc/> (repo público
+`danielopozo-prog/mineriasc`, rama `main`). Convención de cierre: tras cada ciclo con
+commit, también `git push` — Pages redespliega solo en 1-2 min.
 
 ## Comandos
 
@@ -20,8 +26,11 @@ No hay gestor de paquetes, build ni tests: se sirve la carpeta tal cual.
 
 ```bash
 python -m http.server 8123                                                  # la app en http://localhost:8123
+"Iniciar servidor.bat"                                                      # igual, doble clic, para usuarios no técnicos
 python .claude/scripts/gate.py -v                                           # verificación bloqueante (lo más parecido a un test)
-curl -o data/mining_data.json https://seeknd.github.io/Strata/data/mining_data.json   # actualizar datos tras parche
+python .claude/scripts/browser_check.py --path /index.html                  # verificación real en navegador (--width/--height); ver arquitectura.md
+python .claude/scripts/fetch_uex_locations.py                               # regenerar data/uex_locations.json tras parche
+curl -o data/mining_data.json https://seeknd.github.io/Strata/data/mining_data.json   # regenerar data/mining_data.json tras parche
 ```
 
 ## Carácter (aplica a ti y a todos los agentes)
@@ -98,8 +107,9 @@ Reglas duras que vigila (romper una exige actualizar gate y guía en el mismo ca
 
 - **Estático puro**: sin package.json, sin CDNs, sin frameworks, sin backend. Debe poder
   desplegarse en GitHub Pages tal cual.
-- `data/mining_data.json` es **dato generado**: se re-descarga de Strata, nunca se edita
-  a mano, y debe conservar las claves que la app consume.
+- `data/mining_data.json` y `data/uex_locations.json` son **datos generados**: se
+  regeneran (Strata / `fetch_uex_locations.py`), nunca se editan a mano, y deben
+  conservar las claves que la app consume.
 - Todo `<script src>` de index.html existe, todo archivo de `js/` está referenciado, y
   todo `id` consultado por JS existe en el HTML (o lo genera otro módulo).
 - La app funciona sin la API de UEX: datos de juego primero, precios después, nunca
@@ -115,8 +125,9 @@ Orden de carga de globales: `UEX` → `DATA` (+ utilidades `esc`/`fmtNum`/diccio
 vistas (`Finder`, `Locations`, `Refinery`, `Inventory`, `Signals`) → `app.js` (arranque). La trampa
 de precios UEX (bruto con precio medio 0, sufijos « (Ore)»/« (Raw)», grafía
 Quantanium/Quantainium) está resuelta en `DATA.bestSellFor`/`uexRefinedFor` — detalle en
-`.claude/guides/uex-api.md`. Estructura del JSON y su actualización:
-`.claude/guides/datos-juego.md`. Módulos y flujo: `.claude/guides/arquitectura.md`.
+`.claude/guides/uex-api.md`, que también cubre el marketplace P2P y los overrides de
+nombres. Estructura del JSON y su actualización: `.claude/guides/datos-juego.md`.
+Módulos y flujo: `.claude/guides/arquitectura.md`.
 
 ## Cierre de build (reducido, tier mínimo)
 

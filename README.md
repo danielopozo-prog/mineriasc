@@ -8,6 +8,8 @@ Panel de minería para **Star Citizen**, inspirado en [Strata](https://seeknd.gi
 - **Explorador de ubicaciones** — filtro por sistema (Stanton, Pyro, Nyx), minerales disponibles en cada ubicación con su probabilidad relativa por método (nave, FPS, ROC).
 - **Refinería** — métodos de refinado con valoraciones (rendimiento/coste/velocidad, en vivo de UEX) y tabla de bonos de rendimiento por estación.
 - **Inventario personal** — registra lo que minas, agrupa por mineral o ubicación, calcula el valor estimado con precios UEX y exporta a JSON o al portapapeles con formato Discord. Todo se guarda en el `localStorage` de tu navegador.
+- **Señales** — multiplicadores de señal de escáner (x1-x15) por mineral, con búsqueda inversa y favoritos.
+- **Contadores** (`contadores.html`, enlazada desde la cabecera) — temporizadores de Hangar Ejecutivo, impresoras de tarjetas, bóveda de Ruin Station, ciclo de loot y Compboards. Página hermana independiente, con su propio CSS y estado en `localStorage`.
 
 ## Cómo ejecutarlo
 
@@ -17,7 +19,8 @@ Es un sitio 100 % estático (HTML + CSS + JS vanilla, sin dependencias). Solo ne
 python -m http.server 8123
 ```
 
-Y abre <http://localhost:8123>. También puede desplegarse tal cual en GitHub Pages.
+Y abre <http://localhost:8123>. También está publicado en GitHub Pages:
+<https://danielopozo-prog.github.io/mineriasc/>.
 
 **Windows, sin usar la terminal:** haz doble clic en `Iniciar servidor.bat`. Comprueba que
 Python está instalado, levanta el servidor en el puerto 8123 y abre el navegador
@@ -29,17 +32,19 @@ automáticamente. Deja la ventana abierta mientras uses la app; para pararlo, ci
 |---|---|---|
 | Precios, terminales, métodos de refinado | API pública de UEX Corp | En vivo (caché de 30 min en localStorage) |
 | Minerales, ubicaciones, señales, dificultad | `data/mining_data.json` (base de Strata) | Manual: re-descargar de Strata con cada parche |
+| Estaciones, ciudades y outposts | `data/uex_locations.json` (catálogo UEX) | Manual: regenerar con `fetch_uex_locations.py` con cada parche |
 
 Para actualizar los datos de juego tras un parche:
 
 ```bash
 curl -o data/mining_data.json https://seeknd.github.io/Strata/data/mining_data.json
+python .claude/scripts/fetch_uex_locations.py
 ```
 
 ## Estructura
 
 ```
-index.html          Interfaz con las 4 pestañas
+index.html          Interfaz con las 5 pestañas
 css/styles.css      Tema oscuro espacial
 js/uex.js           Cliente de la API UEX con caché
 js/data.js          Carga del JSON e índices (mineral↔ubicación)
@@ -47,7 +52,13 @@ js/finder.js        Pestaña Buscador
 js/locations.js     Pestaña Ubicaciones
 js/refinery.js      Pestaña Refinería
 js/inventory.js     Pestaña Inventario
-data/mining_data.json  Datos de juego (parche 4.9)
+js/signals.js       Pestaña Señales
+data/mining_data.json    Datos de juego (parche 4.9)
+data/uex_locations.json  Catálogo de estaciones/ciudades/outposts UEX
+
+contadores.html      Página hermana de temporizadores (independiente)
+css/contadores.css   Estilos propios de contadores.html
+js/contadores.js     Lógica de contadores.html
 ```
 
 > Proyecto personal. No afiliado a Cloud Imperium Games ni a Strata. Los datos del juego pertenecen a sus respectivos autores.
