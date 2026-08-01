@@ -66,6 +66,45 @@ def main():
             check(f"mining_data.json tiene '{key}'", key in mdata and bool(mdata[key]))
     except Exception as e:  # noqa: BLE001
         check("mining_data.json parsea", False, str(e))
+        mdata = None
+
+    # --- catálogo ampliado de ubicaciones (data/uex_locations.json) -----
+    # Vendorizado desde UEX (script .claude/scripts/fetch_uex_locations.py),
+    # complementa las zonas de minado de mining_data.json — ver
+    # .claude/guides/datos-juego.md. DATA.allLocations() fusiona ambos.
+    uexloc_path = ROOT / "data" / "uex_locations.json"
+    try:
+        uexloc = json.loads(uexloc_path.read_text(encoding="utf-8"))
+        check("uex_locations.json parsea", True)
+        locs = uexloc.get("locations")
+        check("uex_locations.json tiene 'locations' no vacio", isinstance(locs, list) and bool(locs))
+        if isinstance(locs, list) and locs:
+            check("uex_locations.json: entradas tienen name/system/kind",
+                  all({"name", "system", "kind"} <= r.keys() for r in locs))
+            kinds = {r.get("kind") for r in locs}
+            check("uex_locations.json: kinds esperados (city/station/outpost)",
+                  kinds <= {"city", "station", "outpost"}, f"kinds vistos: {sorted(kinds)}")
+            # Valor añadido real del catálogo: una estación grande de Stanton
+            # que NO está en mining_data.json (Strata se centra en minería).
+            names_lower = {(r.get("name") or "").strip().lower() for r in locs}
+            check("uex_locations.json: incluye estaciones fuera de mining_data.json (ej. Everus)",
+                  any("everus" in n for n in names_lower))
+    except Exception as e:  # noqa: BLE001
+        check("uex_locations.json parsea", False, str(e))
+        uexloc = None
+
+    # MIC-L1 (y hermanas L1-L5 de cada planeta) deben aparecer en el catalogo
+    # fusionado: ya viven en mining_data.json (type 'lagrange'), lo que
+    # DATA.allLocations() respeta como fuente prioritaria en el dedup.
+    if mdata is not None:
+        mic_l = [k for k in mdata.get("locations", {}) if k.startswith("MIC-L")]
+        check("mining_data.json: MIC-L1..L5 presentes", len(mic_l) == 5, f"encontrados: {sorted(mic_l)}")
+
+    data_js_src = (ROOT / "js" / "data.js").read_text(encoding="utf-8")
+    check("data.js: allLocations definido", "allLocations()" in data_js_src)
+    check("data.js: uexLocations se carga en load()", "uex_locations.json" in data_js_src)
+    check("data.js: LOC_TYPE_ES cubre 'city' y 'outpost'",
+          '"Ciudad"' in data_js_src and '"Puesto avanzado"' in data_js_src)
 
     # --- multipagina: cada pagina de nivel superior ("hoja" de una app) se
     # valida por separado (scripts, ids), pero js/ y el gate global siguen

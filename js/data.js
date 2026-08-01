@@ -14,6 +14,7 @@ const DATA = {
   uexReady: false,
   marketplaceByBase: {}, // nombre base normalizado (minúsculas) -> [fila averages, ...]
   marketplaceReady: false,
+  uexLocations: [], // catálogo ampliado (ciudades/estaciones/outposts) de data/uex_locations.json
   _refreshInFlight: null, // promesa del refreshLive() en curso, para deduplicar clicks
 
   async load() {
@@ -28,6 +29,19 @@ const DATA = {
     this.refineries = (this.raw.refineries && this.raw.refineries.stations) || {};
 
     this.buildIndexes();
+
+    // Catálogo ampliado de ubicaciones (ciudades/estaciones espaciales/outposts),
+    // vendorizado desde UEX — ver .claude/guides/datos-juego.md y el script
+    // .claude/scripts/fetch_uex_locations.py. Es un fichero LOCAL igual que
+    // mining_data.json (no depende de la API en vivo de UEX), pero se protege
+    // igual: si falta o está corrupto, allLocations() sigue funcionando solo
+    // con las zonas de minado ya cargadas arriba, sin romper el arranque.
+    try {
+      const locRes = await fetch("data/uex_locations.json");
+      this.uexLocations = locRes.ok ? (await locRes.json()).locations || [] : [];
+    } catch (_) {
+      this.uexLocations = [];
+    }
   },
 
   buildIndexes() {
@@ -189,6 +203,54 @@ const DATA = {
   systems() {
     return [...new Set(Object.values(this.locations).map((l) => l.system))].sort();
   },
+
+  // Catálogo COMPLETO de ubicaciones nombradas del juego: fusiona las zonas de
+  // minado de mining_data.json (86, ya integradas en el resto de la app vía
+  // oreToLocations/refineries/etc.) con el catálogo ampliado de UEX —
+  // ciudades, estaciones espaciales (incluye los puntos de Lagrange MIC-L1…L5
+  // y hermanos de cada planeta de Stanton) y outposts — cargado en
+  // `this.uexLocations` durante `load()`. Pensado para selects que necesiten
+  // el listado completo (p.ej. el de ubicación del Inventario), no solo zonas
+  // de minado.
+  //
+  // Contrato:
+  // - Síncrona: solo depende de datos ya cargados por `load()` (dos fetches
+  //   locales, ninguno a la API en vivo de UEX). Llamar después de
+  //   `await DATA.load()`, igual que el resto de índices de `DATA`.
+  // - Devuelve [{name, system, kind}], sin duplicados, ordenado por
+  //   `system` y luego `name` (localeCompare).
+  // - `kind`: 'city' | 'station' | 'outpost' (catálogo UEX) o el `type`
+  //   original de mining_data.json para el resto ('planet', 'moon',
+  //   'lagrange', 'asteroid_belt', 'ring', 'cluster', 'hathor'…) — ver
+  //   `LOC_TYPE_ES` para su etiqueta en español.
+  // - Dedup por (nombre normalizado, sistema): ante colisión gana SIEMPRE la
+  //   entrada de mining_data.json (ya integrada en el resto de la app); la
+  //   de UEX se descarta. Ejemplo: "MIC-L1" existe en ambas fuentes — se
+  //   queda la de mining_data.json (kind: 'lagrange').
+  allLocations() {
+    const key = (name, system) => `${(name || "").trim().toLowerCase()}::${system || ""}`;
+    const seen = new Set();
+    const out = [];
+
+    for (const loc of Object.values(this.locations)) {
+      const k = key(loc.display_name, loc.system);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push({ name: loc.display_name, system: loc.system, kind: loc.type });
+    }
+    for (const loc of this.uexLocations) {
+      const k = key(loc.name, loc.system);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push({ name: loc.name, system: loc.system, kind: loc.kind });
+    }
+
+    out.sort(
+      (a, b) =>
+        (a.system || "").localeCompare(b.system || "") || (a.name || "").localeCompare(b.name || "")
+    );
+    return out;
+  },
 };
 
 /* ---------- utilidades compartidas ---------- */
@@ -221,11 +283,20 @@ const LOC_TYPE_ES = {
   asteroid_belt: "Cinturón de asteroides",
   asteroid_field: "Campo de asteroides",
   asteroid_cluster: "Cúmulo de asteroides",
-  lagrange_point: "Punto de Lagrange",
+  lagrange_point: "Punto de Lagrange", // alias sin uso conocido en mining_data.json (ver 'lagrange')
+  lagrange: "Punto de Lagrange", // valor real de `type` en mining_data.json para MIC-L1 y hermanos
+  lagrange_field: "Campo de Lagrange",
+  cluster: "Cúmulo",
+  hathor: "Cueva",
+  mission_location: "Punto de misión",
   station: "Estación",
   ring: "Anillo",
   cave: "Cueva",
   surface: "Superficie",
+  // kinds del catálogo ampliado de UEX (DATA.allLocations()) — ver
+  // .claude/guides/datos-juego.md
+  city: "Ciudad",
+  outpost: "Puesto avanzado",
 };
 
 const METHOD_ES = {

@@ -98,8 +98,14 @@
         </div>
       </div>
       <form id="inv-form" class="inv-form">
+        <select id="inv-entry-type" title="Tipo de registro">
+          <option value="ore">Mineral concreto</option>
+          <option value="generic">Categoría genérica</option>
+        </select>
         <select id="inv-ore" required></select>
+        <select id="inv-category" hidden></select>
         <input type="number" id="inv-qty" min="0" step="0.01" placeholder="Cantidad (SCU)" required>
+        <input type="text" id="inv-note" placeholder="Nota (opcional, ej. P4-AR)" maxlength="60" hidden>
         <select id="inv-loc"></select>
         <button type="submit" class="btn">Añadir</button>
       </form>

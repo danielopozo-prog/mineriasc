@@ -1,6 +1,33 @@
 /* Pestaña «Inventario»: registro de lo minado, guardado en localStorage.
    Agrupación por mineral o ubicación, valor estimado con precios UEX,
-   y exportación a JSON o texto con formato Discord. */
+   y exportación a JSON o texto con formato Discord.
+
+   Dos tipos de registro conviven en `entries`:
+   - Mineral concreto (formato original, intacto para no perder datos ya
+     guardados): { id, ore, qty, loc, date }. Se identifica por tener `ore`.
+   - Entrada genérica por categoría (Minerales/Armas/Armaduras/Tarjetas/
+     Pinturas/Otros), sin especificar qué mineral o qué ítem exacto:
+     { id, category, qty, unit, loc, note, date }. Se identifica por tener
+     `category`. Nunca tiene precio UEX: `valueOf()` devuelve null a
+     propósito, no se inventa una valoración. */
+
+const CATEGORY_ES = {
+  mineral: "Minerales",
+  weapon: "Armas",
+  armor: "Armaduras",
+  card: "Tarjetas",
+  paint: "Pinturas",
+  other: "Otros",
+};
+
+const CATEGORY_UNIT = {
+  mineral: "SCU",
+  weapon: "ud",
+  armor: "ud",
+  card: "ud",
+  paint: "ud",
+  other: "ud",
+};
 
 const Inventory = {
   STORAGE_KEY: "mineriasc_inventory",
@@ -23,13 +50,37 @@ const Inventory = {
         .map(([k, o]) => `<option value="${k}">${esc(o.display_name)}</option>`)
         .join("");
 
+    const catSel = document.getElementById("inv-category");
+    catSel.innerHTML = Object.entries(CATEGORY_ES)
+      .map(([k, label]) => `<option value="${k}">${esc(label)}</option>`)
+      .join("");
+
+    // Catálogo COMPLETO de ubicaciones (237: ciudades, estaciones tipo
+    // MIC-L1, outposts y zonas de minado), agrupado por sistema.
     const locSel = document.getElementById("inv-loc");
+    const bySystem = {};
+    for (const l of DATA.allLocations()) {
+      (bySystem[l.system || "Otro"] ??= []).push(l);
+    }
     locSel.innerHTML =
       '<option value="">Ubicación (opcional)…</option>' +
-      Object.values(DATA.locationOres)
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((l) => `<option value="${esc(l.name)}">${esc(l.name)} (${esc(l.system)})</option>`)
+      Object.entries(bySystem)
+        .map(
+          ([system, locs]) =>
+            `<optgroup label="${esc(system)}">${locs
+              .map((l) => {
+                const kindLabel = LOC_TYPE_ES[l.kind] || l.kind || "";
+                return `<option value="${esc(l.name)}">${esc(l.name)}${
+                  kindLabel ? " · " + esc(kindLabel) : ""
+                }</option>`;
+              })
+              .join("")}</optgroup>`
+        )
         .join("");
+
+    document.getElementById("inv-entry-type").addEventListener("change", () => this.updateEntryTypeUI());
+    document.getElementById("inv-category").addEventListener("change", () => this.updateEntryTypeUI());
+    this.updateEntryTypeUI();
 
     document.getElementById("inv-form").addEventListener("submit", (e) => {
       e.preventDefault();
@@ -44,17 +95,70 @@ const Inventory = {
     this.render();
   },
 
+  // Alterna el formulario entre "mineral concreto" (flujo original) y
+  // "categoría genérica": oculta/deshabilita lo que no toca en cada modo para
+  // que el required de los campos ocultos no bloquee el submit.
+  updateEntryTypeUI() {
+    const isGenericMode = document.getElementById("inv-entry-type").value === "generic";
+    const oreSel = document.getElementById("inv-ore");
+    const catSel = document.getElementById("inv-category");
+    const noteInp = document.getElementById("inv-note");
+    const qtyInp = document.getElementById("inv-qty");
+
+    oreSel.hidden = isGenericMode;
+    oreSel.required = !isGenericMode;
+    catSel.hidden = !isGenericMode;
+    catSel.required = isGenericMode;
+    noteInp.hidden = !isGenericMode;
+
+    const unit = isGenericMode ? CATEGORY_UNIT[catSel.value] || "ud" : "SCU";
+    qtyInp.placeholder = `Cantidad (${unit})`;
+  },
+
+  isGeneric(entry) {
+    return entry.category !== undefined;
+  },
+
+  labelOf(entry) {
+    return this.isGeneric(entry)
+      ? CATEGORY_ES[entry.category] || entry.category
+      : DATA.ores[entry.ore]?.display_name || entry.ore;
+  },
+
+  unitOf(entry) {
+    return this.isGeneric(entry) ? entry.unit || CATEGORY_UNIT[entry.category] || "ud" : "SCU";
+  },
+
   save() {
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.entries));
   },
 
   add() {
-    const ore = document.getElementById("inv-ore").value;
+    const isGenericMode = document.getElementById("inv-entry-type").value === "generic";
     const qty = parseFloat(document.getElementById("inv-qty").value);
     const loc = document.getElementById("inv-loc").value;
-    if (!ore || !(qty > 0)) return;
+    if (!(qty > 0)) return;
 
-    this.entries.push({ id: Date.now(), ore, qty, loc, date: new Date().toISOString() });
+    if (isGenericMode) {
+      const category = document.getElementById("inv-category").value;
+      if (!category) return;
+      const note = document.getElementById("inv-note").value.trim();
+      this.entries.push({
+        id: Date.now(),
+        category,
+        qty,
+        unit: CATEGORY_UNIT[category] || "ud",
+        loc,
+        note: note || null,
+        date: new Date().toISOString(),
+      });
+      document.getElementById("inv-note").value = "";
+    } else {
+      const ore = document.getElementById("inv-ore").value;
+      if (!ore) return;
+      this.entries.push({ id: Date.now(), ore, qty, loc, date: new Date().toISOString() });
+    }
+
     this.save();
     this.render();
     document.getElementById("inv-qty").value = "";
@@ -83,7 +187,10 @@ const Inventory = {
     this.render();
   },
 
+  // Solo los minerales concretos tienen precio UEX: las entradas genéricas
+  // devuelven null a propósito, nunca un valor inventado.
   valueOf(entry) {
+    if (this.isGeneric(entry)) return null;
     const best = DATA.bestSellFor(entry.ore);
     return best ? entry.qty * best.price : null;
   },
@@ -98,46 +205,60 @@ const Inventory = {
       return;
     }
 
-    const totalScu = this.entries.reduce((s, e) => s + e.qty, 0);
+    // Total SCU: minerales concretos + entradas genéricas de categoría
+    // "Minerales" (misma unidad); armas/armaduras/tarjetas/pinturas/otros se
+    // cuentan aparte porque van en unidades, no en SCU.
+    const scuEntries = this.entries.filter((e) => this.unitOf(e) === "SCU");
+    const genericOtherEntries = this.entries.filter((e) => this.isGeneric(e) && e.unit !== "SCU");
+    const totalScu = scuEntries.reduce((s, e) => s + e.qty, 0);
     const totalValue = this.entries.reduce((s, e) => s + (this.valueOf(e) || 0), 0);
+    const totalGenericUds = genericOtherEntries.reduce((s, e) => s + e.qty, 0);
+
     summary.innerHTML = `
       <div class="stat"><div class="label">Registros</div><div class="value">${this.entries.length}</div></div>
       <div class="stat"><div class="label">Total SCU</div><div class="value">${fmtNum(totalScu, 2)}</div></div>
-      <div class="stat"><div class="label">Valor estimado (venta UEX)</div><div class="value accent">${fmtNum(totalValue)} aUEC</div></div>`;
+      <div class="stat"><div class="label">Valor estimado (venta UEX)</div><div class="value accent">${fmtNum(totalValue)} aUEC</div></div>
+      ${genericOtherEntries.length ? `<div class="stat"><div class="label">Otros objetos (sin valorar)</div><div class="value">${fmtNum(totalGenericUds, 2)} ud</div></div>` : ""}`;
 
     // agrupar
     const groups = {};
     for (const e of this.entries) {
-      const key =
-        this.groupBy === "ore"
-          ? DATA.ores[e.ore]?.display_name || e.ore
-          : e.loc || "Sin ubicación";
+      let key;
+      if (this.groupBy === "ore") {
+        key = this.isGeneric(e) ? `${CATEGORY_ES[e.category] || e.category} (genérico)` : this.labelOf(e);
+      } else {
+        key = e.loc || "Sin ubicación";
+      }
       (groups[key] ??= []).push(e);
     }
 
     list.innerHTML = Object.entries(groups)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([name, items]) => {
-        const scu = items.reduce((s, e) => s + e.qty, 0);
+        const scu = items.filter((e) => this.unitOf(e) === "SCU").reduce((s, e) => s + e.qty, 0);
         const val = items.reduce((s, e) => s + (this.valueOf(e) || 0), 0);
+        const hasValuable = items.some((e) => !this.isGeneric(e));
         const rows = items
-          .map(
-            (e) => `<div class="entry">
+          .map((e) => {
+            const other = this.groupBy === "ore" ? esc(e.loc || "Sin ubicación") : esc(this.labelOf(e));
+            const note = this.isGeneric(e) && e.note ? ` <span class="meta">· ${esc(e.note)}</span>` : "";
+            return `<div class="entry">
               <span>
-                ${this.groupBy === "ore" ? esc(e.loc || "Sin ubicación") : esc(DATA.ores[e.ore]?.display_name || e.ore)}
+                ${other}${note}
                 <span class="meta"> · ${new Date(e.date).toLocaleDateString("es-ES")}</span>
               </span>
               <span>
-                ${fmtNum(e.qty, 2)} SCU
+                ${fmtNum(e.qty, 2)} ${esc(this.unitOf(e))}
                 <button class="entry-del" data-id="${e.id}" title="Eliminar registro">✕</button>
               </span>
-            </div>`
-          )
+            </div>`;
+          })
           .join("");
+        const totalsTxt = `${fmtNum(scu, 2)} SCU · ${hasValuable ? fmtNum(val) + " aUEC" : "sin valorar"}`;
         return `<div class="group">
           <div class="group-head">
             <span>${esc(name)}</span>
-            <span>${fmtNum(scu, 2)} SCU · ${fmtNum(val)} aUEC</span>
+            <span>${totalsTxt}</span>
           </div>${rows}</div>`;
       })
       .join("");
@@ -148,13 +269,28 @@ const Inventory = {
   },
 
   exportJson() {
-    const data = this.entries.map((e) => ({
-      ore: e.ore,
-      ore_name: DATA.ores[e.ore]?.display_name || e.ore,
-      qty_scu: e.qty,
-      location: e.loc || null,
-      date: e.date,
-    }));
+    const data = this.entries.map((e) => {
+      if (this.isGeneric(e)) {
+        return {
+          type: "generic",
+          category: e.category,
+          category_name: CATEGORY_ES[e.category] || e.category,
+          qty: e.qty,
+          unit: this.unitOf(e),
+          note: e.note || null,
+          location: e.loc || null,
+          date: e.date,
+        };
+      }
+      return {
+        type: "ore",
+        ore: e.ore,
+        ore_name: DATA.ores[e.ore]?.display_name || e.ore,
+        qty_scu: e.qty,
+        location: e.loc || null,
+        date: e.date,
+      };
+    });
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -165,19 +301,39 @@ const Inventory = {
   },
 
   async exportDiscord() {
-    const groups = {};
+    const oreGroups = {};
+    const genericGroups = {};
     for (const e of this.entries) {
-      const name = DATA.ores[e.ore]?.display_name || e.ore;
-      groups[name] = (groups[name] || 0) + e.qty;
+      if (this.isGeneric(e)) {
+        const g = (genericGroups[e.category] ??= { qty: 0, notes: [] });
+        g.qty += e.qty;
+        if (e.note) g.notes.push(e.note);
+      } else {
+        const name = DATA.ores[e.ore]?.display_name || e.ore;
+        oreGroups[name] = (oreGroups[name] || 0) + e.qty;
+      }
     }
     const totalValue = this.entries.reduce((s, e) => s + (this.valueOf(e) || 0), 0);
     const lines = [
       "**⛏️ Inventario de minería**",
-      ...Object.entries(groups)
+      ...Object.entries(oreGroups)
         .sort((a, b) => b[1] - a[1])
         .map(([name, qty]) => `> ${name}: **${fmtNum(qty, 2)} SCU**`),
       `Total estimado: **${fmtNum(totalValue)} aUEC**`,
     ];
+    const genericEntries = Object.entries(genericGroups);
+    if (genericEntries.length) {
+      lines.push("", "**📦 Otros objetos (sin valorar)**");
+      lines.push(
+        ...genericEntries
+          .sort((a, b) => b[1].qty - a[1].qty)
+          .map(([cat, g]) => {
+            const unit = CATEGORY_UNIT[cat] || "ud";
+            const notesTxt = g.notes.length ? ` _(${g.notes.join(", ")})_` : "";
+            return `> ${CATEGORY_ES[cat] || cat}: **${fmtNum(g.qty, 2)} ${unit}**${notesTxt}`;
+          })
+      );
+    }
     try {
       await navigator.clipboard.writeText(lines.join("\n"));
       showToast("Copiado al portapapeles (formato Discord)");

@@ -21,10 +21,16 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
 
 ## Flujo de arranque (app.js)
 
-1. `DATA.load()` — carga `data/mining_data.json` y construye índices. Si falla, la app
-   muestra error y no sigue.
+1. `DATA.load()` — carga `data/mining_data.json` y construye índices; si falla, la app
+   muestra error y no sigue. A continuación carga también `data/uex_locations.json`
+   (catálogo ampliado de ciudades/estaciones/outposts, vendorizado desde UEX — ver
+   `.claude/guides/datos-juego.md`) envuelto en `try/catch`: si falta o está corrupto,
+   `DATA.uexLocations` queda `[]` y `DATA.allLocations()` sigue funcionando solo con las
+   zonas de minado de `mining_data.json`, sin bloquear el arranque.
 2. `Finder.init()`, `Locations.init()`, `Inventory.init()`, `Signals.init()` — la app ya
-   es usable con datos de juego, sin precios.
+   es usable con datos de juego, sin precios. Cualquier vista que necesite el listado
+   COMPLETO de ubicaciones (no solo zonas de minado) usa `DATA.allLocations()` — síncrona,
+   ya resuelta tras `await DATA.load()`, sin fetch adicional.
 3. `DATA.loadUexPrices()` — en segundo plano; al resolver, re-renderiza las vistas que
    muestran precios (`Signals` no depende de UEX — solo lee `scanner_signals`, así que
    no se refresca aquí). Si la API falla, la app sigue funcionando (el header lo indica).

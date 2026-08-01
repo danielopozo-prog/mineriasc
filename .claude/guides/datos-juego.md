@@ -35,3 +35,49 @@ Claves presentes pero **no usadas aún**: `compositions`, `cave_compositions`,
 - `ore_locations` (singular invertido) y `computed` existen pero vienen **vacíos**: no
   construir nada sobre ellos.
 - Los `yields` de refinería son enteros con signo (± %), no multiplicadores.
+
+## Catálogo ampliado de ubicaciones (`data/uex_locations.json`)
+
+`mining_data.json.locations` (86 entradas) es el catálogo de Strata: se centra en
+**zonas de minado** (planetas, lunas, cinturones, puntos de Lagrange, un puñado de
+estaciones "outlaw" de Pyro/Nyx). NO incluye ciudades ni la mayoría de estaciones
+comerciales de Stanton (Everus Harbor, Baijini Point, Port Tressler, Seraphim
+Station, Grim HEX…) ni outposts individuales (HDMS-*, Shubin Mining Facility *,
+ArcCorp Mining Area *…). Para tener el listado COMPLETO de ubicaciones nombradas del
+juego (usado por `DATA.allLocations()`, p. ej. para el selector de ubicación del
+Inventario) se vendoriza un segundo fichero, **también dato generado, nunca a mano**:
+
+```bash
+python .claude/scripts/fetch_uex_locations.py
+```
+
+- Fuente: API de UEX Corp, endpoints `cities`, `space_stations`, `outposts` (ver
+  `.claude/guides/uex-api.md`). A diferencia de `mining_data.json` (un único fetch,
+  ya en el formato de la app), UEX no expone estos tres catálogos combinados ni en
+  el formato final, así que el script hace 3 peticiones GET públicas, filtra a
+  `is_available_live=1 && is_visible=1 && is_decommissioned=0` y normaliza a
+  `{name, system, kind, planet, moon?}`.
+- Por qué vendorizado y no fetch en vivo con caché de `localStorage` (como los
+  precios de UEX): el selector de ubicación del Inventario debe funcionar **offline**
+  (invariante "la app funciona sin la API de UEX"); un dato que rara vez cambia
+  (nombres de ciudades/estaciones/outposts, no precios) no necesita refrescarse en
+  cada sesión — igual que `mining_data.json`, se regenera tras un parche, no en cada
+  carga de página.
+- Nombre elegido por tipo: `space_stations` usa `nickname` (`"MIC-L1"`, `"Checkmate"`,
+  `"Grim HEX"`) — es como Strata y la comunidad los llaman; el `name` completo de UEX
+  es texto de sabor (`"MIC-L1 Shallow Frontier Station"`). `outposts` usa `name`
+  completo (`"HDMS-Bezdek"`, no `"Bezdek"`) — más descriptivo. `cities` no tiene
+  `nickname` en la API.
+- Quirk de UEX conocido: alguna ubicación tiene dos filas bajo el mismo nombre (p.ej.
+  dos outposts "Jumptown" en Stanton — uno en Yela, resto fantasma previo a la
+  reubicación a Daymar). El script deduplica por `(nombre, sistema)` quedándose con
+  la fila de mayor `date_added` (la más reciente en la API).
+- Tamaño real (parche actual): ~24 KB, 175 ubicaciones únicas (5 ciudades, 59
+  estaciones, 112 outposts, contadores exactos en `meta.counts` del propio fichero).
+- Consumo: `DATA.load()` lo carga en `DATA.uexLocations` tras `mining_data.json`,
+  envuelto en `try/catch` — si falta, no rompe el arranque (ver
+  `.claude/guides/arquitectura.md`). `DATA.allLocations()` lo fusiona con
+  `mining_data.json.locations`, deduplicando por `(nombre, sistema)` con
+  **mining_data.json como fuente prioritaria** (ya integrada con
+  `oreToLocations`/`refineries`/etc.) — así `"MIC-L1"` sale una sola vez, con
+  `kind: "lagrange"` (el de Strata), no `"station"` (el de UEX).

@@ -107,7 +107,20 @@ La UI puede forzar datos frescos saltando el TTL de 30 min de `localStorage`
   datos previos). No usar para refrescos automáticos/polling: es para una
   acción explícita del usuario, dentro del límite de 120 peticiones/min de UEX.
 
+## Catálogo de ubicaciones (`cities`, `space_stations`, `outposts`)
+
+Estos tres endpoints (CORS abierto, verificado) NO se llaman desde el navegador:
+alimentan `data/uex_locations.json`, un fichero vendorizado (regenerado con
+`python .claude/scripts/fetch_uex_locations.py`) que complementa las zonas de minado
+de `mining_data.json` con el catálogo completo de ciudades/estaciones/outposts —
+detalle de campos, naming y quirks en `.claude/guides/datos-juego.md`. Se resolvió
+así (dato generado, no fetch en vivo) porque el selector que lo consume
+(`DATA.allLocations()`) debe funcionar sin conexión, y estos nombres cambian con
+parches, no con precios. Nota de implementación: `urllib` de Python recibe 403 de
+Cloudflare sin `User-Agent` de navegador — el script ya manda uno.
+
 ## Qué más ofrece la API (no usado aún)
 
 `refineries_yields`, `refineries_capacities`, rutas de comercio, vehículos, terminales
-con distancias. Documentación: https://uexcorp.space/api/documentation/
+con distancias, `star_systems`, `planets`, `moons`, `orbits` (puntos de salto).
+Documentación: https://uexcorp.space/api/documentation/
