@@ -47,4 +47,12 @@
     meta.textContent = `Parche ${DATA.raw.meta.current_patch} · datos del ${DATA.raw.meta.data_updated} · precios UEX no disponibles`;
     console.warn("UEX no disponible:", err);
   }
+
+  // Medias del Marketplace P2P (anuncios entre jugadores), igual de no bloqueante
+  try {
+    await DATA.loadMarketplaceAverages();
+    if (Finder.selected) Finder.renderDetail(Finder.selected);
+  } catch (err) {
+    console.warn("Marketplace UEX no disponible:", err);
+  }
 })();

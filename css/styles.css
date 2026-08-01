@@ -342,6 +342,7 @@ tr:nth-child(even) td { background: rgba(22, 18, 18, 0.5); }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
 td.good { color: var(--good); }
 td.bad { color: var(--bad); }
+tr.low-confidence td { opacity: 0.55; }
 
 /* ---------- Cards ---------- */
 .cards-row {

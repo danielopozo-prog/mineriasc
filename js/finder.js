@@ -49,6 +49,7 @@ const Finder = {
     const uexRef = DATA.uexRefinedFor(oreKey);
     const locs = DATA.oreToLocations[oreKey] || [];
     const sigs = DATA.oreToSignals[oreKey] || [];
+    const mkt = DATA.marketplaceAvgFor(oreKey);
 
     const locRows = locs
       .map(
@@ -93,6 +94,28 @@ const Finder = {
         }
       </div>
       ${uexRaw || uexRef ? `<div id="ore-terminals" class="loading">Cargando mejores terminales de venta…</div>` : ""}
+
+      ${
+        mkt.length
+          ? `<h4>Mercado de jugadores (UEX Marketplace)</h4>
+            <p class="hint" title="Media de anuncios entre jugadores en el Marketplace de UEX, por tramo de calidad. Dato orientativo, no es precio oficial de terminal.">
+              Anuncios entre jugadores, por tramo de calidad · orientativo, no oficial
+            </p>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Calidad</th><th>Precio medio/SCU</th><th>Anuncios</th></tr></thead>
+              <tbody>${mkt
+                .map(
+                  (m) => `<tr class="${m.listingsCount < 3 ? "low-confidence" : ""}" title="${
+                    m.listingsCount < 3 ? "Pocos anuncios: dato poco fiable" : ""
+                  }">
+                    <td>${esc(m.qualityLabel)}</td>
+                    <td class="num">${fmtNum(m.priceAvgScu)} aUEC</td>
+                    <td class="num">${fmtNum(m.listingsCount)}</td>
+                  </tr>`
+                )
+                .join("")}</tbody></table></div>`
+          : ""
+      }
 
       <h4>Dificultad de minado</h4>
       <div class="stat-grid">

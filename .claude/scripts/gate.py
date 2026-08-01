@@ -86,6 +86,25 @@ def main():
         missing = used - html_ids - dyn
         check(f"{p.name}: ids existen en el HTML", not missing, f"faltan: {sorted(missing)}")
 
+    # --- marketplace averages (medias P2P por tramo de calidad) --------
+    uex_js = (ROOT / "js" / "uex.js").read_text(encoding="utf-8")
+    check("uex.js: marketplaceAveragesAll definido", "marketplaceAveragesAll" in uex_js)
+    check("uex.js: marketplaceAveragesAll expuesto en el objeto devuelto",
+          re.search(r"return\s*\{[^}]*marketplaceAveragesAll[^}]*\}", uex_js, re.S) is not None)
+    check("uex.js: marketplace_prices_averages_all filtra scu+sell antes de cachear",
+          "unit === \"scu\"" in uex_js and "operation === \"sell\"" in uex_js,
+          "el payload sin filtrar (~1,3 MB) agota la cuota de localStorage")
+
+    data_js = (ROOT / "js" / "data.js").read_text(encoding="utf-8")
+    check("data.js: loadMarketplaceAverages definido", "loadMarketplaceAverages" in data_js)
+    check("data.js: marketplaceAvgFor definido", "marketplaceAvgFor" in data_js)
+    check("data.js: QUALITY_TIER_LABELS definido", "QUALITY_TIER_LABELS" in data_js)
+    # tabla de tramos verificada empiricamente (uexcorp.space/marketplace/averages):
+    # no es floor(quality/100) — proteger contra una "correccion" a ciegas.
+    m = re.search(r"QUALITY_TIER_LABELS\s*=\s*\{(.*?)\}", data_js, re.S)
+    tier_labels_ok = bool(m) and "5: \"Q800-899\"" in (m.group(1) if m else "")
+    check("data.js: tramo quality_tier=5 es Q800-899 (verificado, no lineal)", tier_labels_ok)
+
     # el estatico sigue siendo estatico
     check("sin package.json (sin build)", not (ROOT / "package.json").exists())
     cdn_markers = ("cdn.", "unpkg", "jsdelivr", "fonts.googleapis", "fonts.gstatic")
