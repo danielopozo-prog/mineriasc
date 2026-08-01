@@ -741,71 +741,91 @@ footer a { color: var(--info); text-decoration: none; }
   display: grid;
   gap: 6px;
 }
-/* ×1..5: el grupo protagonista, tarjetas grandes en fila/bloque superior.
-   Ancho contenido a propósito (no 1fr con minmax grande): dimensionadas
-   como si cupieran ~7 en la fila aunque solo se dibujen 5, para no dejar
-   hueco de sobra a la derecha en pantallas anchas — ver el `repeat(7, …)`
-   fijo de la media query de escritorio más abajo. */
+/* ×1..7: el grupo protagonista, tarjetas grandes en fila superior a ancho
+   completo. En móvil fluye por auto-fill; en escritorio (ver media queries
+   más abajo) se fija a `repeat(7, …)` para llenar el 100% del contenedor
+   y que su borde derecho quede alineado con el de .mult-grid-rest. */
 .mult-grid-main {
   grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
 }
-/* ×6..15: mismo dato, tarjetas compactas debajo — jerarquía de un vistazo. */
+/* ×8..15: mismo dato, tarjetas compactas debajo — jerarquía de un vistazo.
+   8 columnas (no 10): al quedar 8 múltiplos abajo en vez de 10, cada
+   tarjeta gana ancho y la rejilla sigue llenando el 100% del contenedor,
+   alineada con la fila superior. */
 .mult-grid-rest {
   grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
   gap: 5px;
 }
+/* La tarjeta ya NO apila etiqueta encima de valor: label pequeña y tenue a
+   la izquierda, en línea, + el valor — así la cifra gana toda la altura y
+   casi todo el ancho de la tarjeta que antes se repartía con la etiqueta.
+   Mismo lenguaje visual en .mult-grid-main y .mult-grid-rest. */
 .mult-card {
   background: var(--bg-alt);
   border: 1px solid var(--border-muted);
   border-radius: var(--radius-sm);
-  padding: 6px;
-  text-align: center;
-  /* Contexto de container query: .mult-value ajusta su tamaño al ancho real
-     de ESTA tarjeta (ver más abajo), no al viewport — así nunca desborda,
-     sea cual sea el nº de columnas, el nº de minerales apilados o si el
-     navegador cambia de breakpoint. */
-  container-type: inline-size;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
 }
 .mult-grid-rest .mult-card {
-  padding: 4px;
+  padding: 5px 4px;
+  gap: 3px;
 }
 .mult-label {
+  flex: 0 0 auto;
   font-family: var(--font-ui);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--accent-2);
+  letter-spacing: 0.2px;
+  color: var(--text-dim);
 }
 .mult-grid-rest .mult-label {
-  font-size: 0.6rem;
+  font-size: 0.58rem;
+}
+/* Contenedor REAL de la container query del valor (no la tarjeta entera):
+   flex:1 sobre el hueco que le deja `.mult-label`, para que su tamaño
+   fluido se calcule sobre el ancho que de verdad tiene disponible — si se
+   calculara sobre la tarjeta completa (incluida la etiqueta) podría
+   desbordar. `min-width:0` es necesario para que un item flex pueda
+   encogerse por debajo del ancho de su contenido en tarjetas estrechas. */
+.mult-value-wrap {
+  flex: 1 1 0;
+  min-width: 0;
+  container-type: inline-size;
+  text-align: center;
 }
 .mult-value {
+  display: inline-block;
   font-family: var(--font-num);
   /* Tamaño fijo de reserva por si el navegador no soporta container queries
      (ver @supports más abajo): deliberadamente conservador para que, aun
      sin el ajuste fino, nunca desborde la tarjeta con valores de 6 cifras
      (p. ej. "64.275"). */
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 600;
-  line-height: 1.15;
+  line-height: 1.1;
   color: var(--text);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .mult-grid-rest .mult-value {
-  font-size: 0.85rem;
+  font-size: 1rem;
 }
-/* La cifra se ajusta al ancho real de su propia tarjeta (container query),
-   nunca al viewport: crece en tarjetas anchas y encoge en las estrechas sin
-   desbordar nunca, incluidos los valores de 6 cifras con separador de miles
-   ("64.275"). Es la corrección de fondo del "los números se salen de las
-   cajas": los tamaños fijos por breakpoint no podían cubrir a la vez una
-   tarjeta de ~100px (tablet) y una de ~165px (escritorio ancho). */
+/* La cifra se ajusta al ancho real de SU hueco (container query sobre
+   .mult-value-wrap, ya sin la etiqueta), nunca al viewport: crece en
+   tarjetas anchas y encoge en las estrechas sin desbordar nunca, incluidos
+   los valores de 6 cifras con separador de miles ("64.275"). Los máximos
+   de la fila compacta (×8-15) se subieron notablemente respecto al primer
+   intento (label encima del valor): al liberar esa fila de la etiqueta,
+   la cifra puede crecer bastante más sin tocar el ancho de columna. */
 @supports (container-type: inline-size) {
-  .mult-grid-main .mult-value { font-size: clamp(1.3rem, 22cqw, 2.6rem); }
-  .mult-grid-rest .mult-value { font-size: clamp(0.62rem, 17cqw, 1.3rem); }
+  .mult-grid-main .mult-value { font-size: clamp(1.6rem, 30cqw, 3.4rem); }
+  .mult-grid-rest .mult-value { font-size: clamp(1.1rem, 32cqw, 2.4rem); }
 }
-/* Separador sutil entre el grupo grande (×1-5) y el compacto (×6-15). */
+/* Separador sutil entre el grupo grande (×1-7) y el compacto (×8-15). */
 .mult-sep {
   display: flex;
   align-items: center;
@@ -826,20 +846,18 @@ footer a { color: var(--info); text-decoration: none; }
   background: var(--border-muted);
 }
 @media (min-width: 700px) {
-  /* ×6..15 en escritorio: 10 columnas fijas para que quepan siempre en una sola fila. */
-  .mult-grid-rest { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
-  .mult-grid-rest .mult-card { padding: 3px; }
+  /* ×1-7 y ×8-15 en escritorio: 7 y 8 columnas fijas respectivamente, ambas
+     rejillas al 100% del ancho del contenedor — bordes izquierdo y derecho
+     alineados entre sí, sin hueco. */
+  .mult-grid-main { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .mult-grid-rest { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+  .mult-grid-rest .mult-card { padding: 4px 5px; }
 }
 @media (min-width: 1100px) {
-  /* ×1-5: 7 columnas fijas aunque solo se dibujen 5 tarjetas — "dimensionadas
-     como si cupieran 7", para que no quede un hueco grande a la derecha ni
-     las tarjetas se estiren de más en pantallas anchas. */
   .mult-grid-main { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
-  .mult-grid-rest { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px; }
-  .mult-grid-main .mult-card { padding: 8px 4px; }
-  .mult-grid-main .mult-label { font-size: 0.7rem; }
-  .mult-grid-rest .mult-card { padding: 4px; }
-  .mult-grid-rest .mult-label { font-size: 0.7rem; }
+  .mult-grid-rest { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
+  .mult-grid-main .mult-card { padding: 8px 10px; }
+  .mult-grid-rest .mult-card { padding: 5px 6px; }
   .sig-hit-value { font-size: 2.6rem; }
   .sig-hit-ore { font-size: 1.5rem; }
 }

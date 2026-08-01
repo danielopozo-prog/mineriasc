@@ -417,9 +417,23 @@ const Signals = {
   },
 
   // Tarjetas de múltiplos (×1..15) de un grupo de señales (mismo valor
-  // base). Dos niveles: ×1..5 grandes, ×6..15 compactos debajo — misma
-  // información, jerarquía visual clara de un vistazo. Extraído para
-  // poder repetirse una vez por mineral cuando hay varios seleccionados.
+  // base). Dos niveles: ×1..7 grandes en una fila a ancho completo, ×8..15
+  // compactos debajo en otra fila también a ancho completo (7 y 8 columnas
+  // respectivamente en escritorio — ver .mult-grid-main/.mult-grid-rest en
+  // styles.css: ambas rejillas ocupan el 100% del contenedor así que sus
+  // bordes quedan alineados sin hueco) — misma información, jerarquía
+  // visual clara de un vistazo. Extraído para poder repetirse una vez por
+  // mineral cuando hay varios seleccionados.
+  // Dentro de cada tarjeta la etiqueta ×N ya NO va en su propia fila encima
+  // del valor (eso robaba altura a la cifra, que es lo que el jugador
+  // realmente necesita leer de un vistazo): va en línea, pequeña y tenue, a
+  // la izquierda de la cifra — mismo lenguaje visual en las 15 tarjetas
+  // (grandes y compactas), para que ambas filas se lean como un mismo
+  // sistema. El valor vive en su propio `.mult-value-wrap`, que es el
+  // contenedor real de la container query (ver styles.css): así su tamaño
+  // fluido se calcula sobre el ancho que le queda DESPUÉS de la etiqueta,
+  // no sobre el ancho completo de la tarjeta — si se calculara sobre la
+  // tarjeta entera, la cifra podría desbordar el hueco que de verdad tiene.
   // `singleGroup`: cuando el mineral solo tiene un valor base (caso
   // habitual) los metadatos ya se muestran en la cabecera del mineral (ver
   // renderOreSection) y aquí se omiten para no repetirlos; con varios
@@ -429,10 +443,10 @@ const Signals = {
   blocksHtml(oreKey, groups, singleGroup) {
     return groups
       .map((g) => {
-        const MAIN_MULTIPLIERS = 5;
+        const MAIN_MULTIPLIERS = 7;
         const cardHtml = (m) => `<div class="mult-card">
-              <div class="mult-label">×${m}</div>
-              <div class="mult-value">${fmtNum(g.value * m)}</div>
+              <span class="mult-label">×${m}</span>
+              <span class="mult-value-wrap"><span class="mult-value">${fmtNum(g.value * m)}</span></span>
             </div>`;
 
         const mainCards = Array.from({ length: MAIN_MULTIPLIERS }, (_, i) => i + 1)
