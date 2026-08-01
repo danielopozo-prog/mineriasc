@@ -38,7 +38,12 @@ vendorizadas) y los módulos de vista `js/finder.js`, `js/locations.js`, `js/ref
 - El inventario del usuario vive solo en `localStorage` (clave `mineriasc_inventory`);
   nada de enviarlo a servidores.
 - Validación: `python .claude/scripts/gate.py -v` **y** prueba real en el navegador
-  (servidor local, las 4 pestañas). No des por bueno lo que solo has razonado.
+  (servidor local, las 5 pestañas). No des por bueno lo que solo has razonado. Para
+  comprobaciones reproducibles de datos/expresiones en tiempo de ejecución (ids
+  presentes, `DATA`/`UEX` ya cargados, valores calculados) usa
+  `.claude/scripts/browser_check.py` en vez de montar Chrome headless a mano — ver
+  `.claude/guides/arquitectura.md`. Para verificación visual/de interacción real
+  sigue haciendo falta abrir el navegador tú mismo.
 
 ## Guías de referencia
 

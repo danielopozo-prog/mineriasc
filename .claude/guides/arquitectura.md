@@ -72,3 +72,40 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
     selección): persisten en `mineriasc_favorites`, se listan agrupados
     bajo "Favoritos" arriba de la lista lateral, y se priorizan (antes que
     la cercanía) al ordenar los resultados de la búsqueda inversa.
+
+## Verificación real en navegador (`.claude/scripts/browser_check.py`)
+
+El gate (`gate.py`) es estático: comprueba texto y estructura de archivos, no que la
+app funcione de verdad en un navegador. Para eso existe `browser_check.py`, que
+encapsula el patrón de Chrome headless + DevTools Protocol para que ningún agente
+tenga que reinventarlo:
+
+1. Sirve la carpeta del proyecto en `http://localhost:8123` (reutiliza un servidor ya
+   levantado en ese puerto si lo encuentra; si no, arranca uno temporal con
+   `python -m http.server` y lo cierra al terminar).
+2. Lanza Chrome headless con remote debugging (autodetecta `chrome.exe`; admite
+   `--chrome` o la variable de entorno `CHROME_PATH` como overrides). Requiere el flag
+   `--remote-allow-origins=*` — sin él, Chrome moderno rechaza el handshake websocket
+   del CDP con 403 (hardening post CVE-2022-3699); ya viene incluido en el script.
+3. Abre la página indicada (`--path`, por defecto `/index.html`).
+4. Si se pasa `--wait "<expresión JS>"`, hace polling hasta que sea verdadera o
+   agota `--timeout` (por defecto 10 s).
+5. Evalúa cada `--eval "<expresión JS>"` (repetible) vía `Runtime.evaluate` y
+   vuelca un JSON por stdout con los valores/errores; sale con código 0 si todo
+   fue bien, 1 si `--wait` no se cumplió o alguna expresión lanzó excepción.
+6. Cierra Chrome siempre; el servidor solo si lo arrancó él mismo (nunca mata uno
+   que ya estaba corriendo).
+
+Ejemplo real (usado para verificar que `marketplaceAveragesAll` sirve datos):
+
+```bash
+python .claude/scripts/browser_check.py \
+    --wait "DATA.marketplaceReady === true" \
+    --eval "DATA.marketplaceAvgFor('COPPER').find(t => t.qualityTier === 5).priceAvgScu"
+```
+
+No sustituye a probar las pestañas a ojo cuando el cambio es de interacción/visual —
+para eso sigue haciendo falta abrir el navegador de verdad — pero cubre la
+comprobación reproducible de "esta expresión/dato es correcto en tiempo de
+ejecución", útil tanto para `web-ui` (ids, render, `DATA`/`UEX` ya cargados) como
+para `datos-uex` (forma de los datos, ausencia de errores de carga).

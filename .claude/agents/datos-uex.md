@@ -28,7 +28,10 @@ utilidades de precio) y `js/uex.js` (cliente de la API de UEX Corp).
   y los precios llegan después sin bloquear (patrón actual de `app.js`, no romperlo).
 - No introduzcas backend ni claves: todo se consulta desde el navegador.
 - Validación: `python .claude/scripts/gate.py -v` **y** comprobar en consola del
-  navegador que no hay errores de carga ni de CORS.
+  navegador que no hay errores de carga ni de CORS. Para comprobar en frío que
+  `DATA`/`UEX` cargan y devuelven la forma esperada (sin abrir DevTools a mano), usa
+  `.claude/scripts/browser_check.py --wait ... --eval ...` — ver
+  `.claude/guides/arquitectura.md`.
 
 ## Guías de referencia
 
