@@ -376,17 +376,59 @@ const Signals = {
     btn.textContent = n > 1 ? `Limpiar selección (${n})` : "Limpiar selección";
   },
 
+  // Metadatos de un grupo de señales (tier + contexto + valor base), en
+  // HTML listo para insertar tanto en la cabecera del mineral (grupo único,
+  // caso habitual) como en la cabecera de un bloque suelto (varios grupos,
+  // ver blocksHtml). La pill de tier de señal duplica visualmente el badge
+  // de RAREZA del mineral (rarityBadgeHtml) cuando coinciden — son el mismo
+  // campo de origen en mining_data.json (ver comentario junto a
+  // RARITY_TIERS_VALID en data.js) — así que aquí se decide cuál mostrar:
+  //   - Tier válido como rareza (common…legendary) e igual a la rareza ya
+  //     mostrada junto al nombre → se omite la pill, sería la misma
+  //     etiqueta dos veces en la misma fila.
+  //   - Tier válido como rareza pero DISTINTO de la rareza del mineral
+  //     (mineral con varios grupos de tier distinto — no observado en el
+  //     patch actual, pero posible) → se mantiene, con un "Señal:" delante
+  //     para dejar claro que es el tier de ESTA señal, no la rareza general.
+  //   - Tier no válido como rareza (p. ej. "fps"/"vehicle": el propio
+  //     mining_context filtrado en el campo tier, ver Carinite) → no se
+  //     muestra como pill: ya lo dice contextLabel, repetirlo confundiría.
+  groupMetaHtml(oreKey, g) {
+    const tiers = [...g.tiers];
+    const mainTier = tiers[0];
+    const multiTier = tiers.length > 1;
+    const contextLabel = [...g.contexts]
+      .map((c) => SIGNAL_CONTEXT_ES[c] || c)
+      .filter(Boolean)
+      .join(" · ");
+
+    let tierPill = "";
+    if (multiTier) {
+      tierPill = `<span class="pill tier-${esc(mainTier)}">${esc(tiers.join(" / "))}</span>`;
+    } else if (RARITY_TIERS_VALID.has(mainTier)) {
+      const rarity = DATA.rarityFor(oreKey);
+      const dedupWithRarityBadge = rarity && rarity.tier === mainTier;
+      if (!dedupWithRarityBadge) {
+        tierPill = `<span class="hint">Señal:</span> <span class="pill tier-${esc(mainTier)}">${esc(RARITY_ES[mainTier] || mainTier)}</span>`;
+      }
+    }
+
+    return `${tierPill}<span class="hint">${esc(contextLabel)}</span><span class="signal-base">Base: <b>${fmtNum(g.value)}</b></span>`;
+  },
+
   // Tarjetas de múltiplos (×1..15) de un grupo de señales (mismo valor
   // base). Dos niveles: ×1..5 grandes, ×6..15 compactos debajo — misma
   // información, jerarquía visual clara de un vistazo. Extraído para
   // poder repetirse una vez por mineral cuando hay varios seleccionados.
-  blocksHtml(groups) {
+  // `singleGroup`: cuando el mineral solo tiene un valor base (caso
+  // habitual) los metadatos ya se muestran en la cabecera del mineral (ver
+  // renderOreSection) y aquí se omiten para no repetirlos; con varios
+  // grupos (p. ej. Carinite fps/vehicle) cada bloque conserva su propia
+  // cabecera porque, si no, no se sabría a qué valor base pertenece cada
+  // rejilla de tarjetas.
+  blocksHtml(oreKey, groups, singleGroup) {
     return groups
       .map((g) => {
-        const mainTier = [...g.tiers][0];
-        const tierLabel = [...g.tiers].join(" / ");
-        const contextLabel = [...g.contexts].map((c) => SIGNAL_CONTEXT_ES[c] || c).join(" · ");
-
         const MAIN_MULTIPLIERS = 5;
         const cardHtml = (m) => `<div class="mult-card">
               <div class="mult-label">×${m}</div>
@@ -403,13 +445,13 @@ const Signals = {
           .map(cardHtml)
           .join("");
 
+        const blockHead = singleGroup
+          ? ""
+          : `<div class="signal-block-head">${this.groupMetaHtml(oreKey, g)}</div>`;
+
         return `
           <div class="signal-block">
-            <div class="signal-block-head">
-              <span class="pill tier-${esc(mainTier)}">${esc(tierLabel)}</span>
-              <span class="hint">${esc(contextLabel)}</span>
-              <span class="signal-base">Base: <b>${fmtNum(g.value)}</b></span>
-            </div>
+            ${blockHead}
             <div class="mult-grid mult-grid-main">${mainCards}</div>
             <div class="mult-sep"><span>×${MAIN_MULTIPLIERS + 1} – ×${SIGNAL_MULTIPLIERS}</span></div>
             <div class="mult-grid mult-grid-rest">${restCards}</div>
@@ -428,16 +470,27 @@ const Signals = {
       ? `<button type="button" class="btn small danger sig-remove-btn" data-ore="${esc(oreKey)}" title="Quitar de la selección">Quitar</button>`
       : "";
 
+    // Con un único valor base (caso habitual) los metadatos (tier de señal /
+    // contexto / base) suben a la cabecera del mineral, a la derecha del
+    // nombre — con varios valores base se quedan en cada bloque (ver
+    // blocksHtml) porque aquí arriba no hay sitio para mostrar dos "Base:"
+    // sin confundir a cuál pertenece cada rejilla.
+    const singleGroup = groups.length === 1 ? groups[0] : null;
+    const headMeta = singleGroup
+      ? `<div class="sig-head-meta">${this.groupMetaHtml(oreKey, singleGroup)}</div>`
+      : "";
+
     return `
       <div class="sig-mineral-section ${multi ? "sig-mineral-section-multi" : ""}">
         <div class="detail-head-row">
           <h3>${esc(ore.display_name)}</h3>
           ${rarityBadgeHtml(oreKey)}
+          ${headMeta}
           ${this.favStarHtml(oreKey, "fav-star-lg")}
           ${removeBtn}
         </div>
         <p class="subtitle">Señal de escáner · ${groups.length} valor${groups.length === 1 ? "" : "es"} distinto${groups.length === 1 ? "" : "s"}</p>
-        ${this.blocksHtml(groups)}
+        ${this.blocksHtml(oreKey, groups, !!singleGroup)}
       </div>`;
   },
 

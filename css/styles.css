@@ -261,6 +261,7 @@ input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(
 
 .detail-head-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -700,6 +701,23 @@ footer a { color: var(--info); text-decoration: none; }
    secciones seguidas deben caber con poco scroll. */
 .sig-mineral-section .subtitle { margin-bottom: 6px; }
 
+/* Metadatos (pill de tier de señal / contexto / base) subidos a la cabecera
+   del mineral, a la derecha del nombre, cuando solo hay un valor base (caso
+   habitual — ver Signals.groupMetaHtml/renderOreSection: con varios valores
+   base, cada bloque conserva su propia .signal-block-head porque ahí sí hay
+   ambigüedad de a qué grupo pertenece cada uno). Reutiliza .signal-base y
+   .pill; solo cambia el contenedor y quita el margin-left:auto (aquí no hay
+   que empujarlo al borde, ya comparte fila con el nombre). */
+.sig-head-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.sig-head-meta .signal-base { margin-left: 0; }
+
 /* ---------- Señales de escáner (vista glanceable de múltiplos) ---------- */
 .signal-block {
   background: var(--panel);
@@ -723,9 +741,13 @@ footer a { color: var(--info); text-decoration: none; }
   display: grid;
   gap: 6px;
 }
-/* ×1..5: el grupo protagonista, tarjetas grandes en fila/bloque superior. */
+/* ×1..5: el grupo protagonista, tarjetas grandes en fila/bloque superior.
+   Ancho contenido a propósito (no 1fr con minmax grande): dimensionadas
+   como si cupieran ~7 en la fila aunque solo se dibujen 5, para no dejar
+   hueco de sobra a la derecha en pantallas anchas — ver el `repeat(7, …)`
+   fijo de la media query de escritorio más abajo. */
 .mult-grid-main {
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
 }
 /* ×6..15: mismo dato, tarjetas compactas debajo — jerarquía de un vistazo. */
 .mult-grid-rest {
@@ -738,6 +760,11 @@ footer a { color: var(--info); text-decoration: none; }
   border-radius: var(--radius-sm);
   padding: 6px;
   text-align: center;
+  /* Contexto de container query: .mult-value ajusta su tamaño al ancho real
+     de ESTA tarjeta (ver más abajo), no al viewport — así nunca desborda,
+     sea cual sea el nº de columnas, el nº de minerales apilados o si el
+     navegador cambia de breakpoint. */
+  container-type: inline-size;
 }
 .mult-grid-rest .mult-card {
   padding: 4px;
@@ -755,14 +782,28 @@ footer a { color: var(--info); text-decoration: none; }
 }
 .mult-value {
   font-family: var(--font-num);
-  font-size: 2.1rem;
+  /* Tamaño fijo de reserva por si el navegador no soporta container queries
+     (ver @supports más abajo): deliberadamente conservador para que, aun
+     sin el ajuste fino, nunca desborde la tarjeta con valores de 6 cifras
+     (p. ej. "64.275"). */
+  font-size: 1.5rem;
   font-weight: 600;
   line-height: 1.15;
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 .mult-grid-rest .mult-value {
-  font-size: 1.05rem;
+  font-size: 0.85rem;
+}
+/* La cifra se ajusta al ancho real de su propia tarjeta (container query),
+   nunca al viewport: crece en tarjetas anchas y encoge en las estrechas sin
+   desbordar nunca, incluidos los valores de 6 cifras con separador de miles
+   ("64.275"). Es la corrección de fondo del "los números se salen de las
+   cajas": los tamaños fijos por breakpoint no podían cubrir a la vez una
+   tarjeta de ~100px (tablet) y una de ~165px (escritorio ancho). */
+@supports (container-type: inline-size) {
+  .mult-grid-main .mult-value { font-size: clamp(1.3rem, 22cqw, 2.6rem); }
+  .mult-grid-rest .mult-value { font-size: clamp(0.62rem, 17cqw, 1.3rem); }
 }
 /* Separador sutil entre el grupo grande (×1-5) y el compacto (×6-15). */
 .mult-sep {
@@ -785,23 +826,19 @@ footer a { color: var(--info); text-decoration: none; }
   background: var(--border-muted);
 }
 @media (min-width: 700px) {
-  .mult-value { font-size: 2.4rem; }
   /* ×6..15 en escritorio: 10 columnas fijas para que quepan siempre en una sola fila. */
   .mult-grid-rest { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
   .mult-grid-rest .mult-card { padding: 3px; }
-  .mult-grid-rest .mult-value { font-size: 1.05rem; }
 }
 @media (min-width: 1100px) {
-  /* Tarjetas ×1-5: gap y padding reducidos frente a versiones anteriores —
-     la cifra (.mult-value) no encoge, solo el aire alrededor, para que 2-3
-     minerales seleccionados quepan con poco scroll. */
-  .mult-grid-main { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  /* ×1-5: 7 columnas fijas aunque solo se dibujen 5 tarjetas — "dimensionadas
+     como si cupieran 7", para que no quede un hueco grande a la derecha ni
+     las tarjetas se estiren de más en pantallas anchas. */
+  .mult-grid-main { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
   .mult-grid-rest { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px; }
-  .mult-grid-main .mult-card { padding: 4px 8px; }
+  .mult-grid-main .mult-card { padding: 8px 4px; }
   .mult-grid-main .mult-label { font-size: 0.7rem; }
   .mult-grid-rest .mult-card { padding: 4px; }
-  .mult-value { font-size: 3.2rem; }
-  .mult-grid-rest .mult-value { font-size: 1.3rem; }
   .mult-grid-rest .mult-label { font-size: 0.7rem; }
   .sig-hit-value { font-size: 2.6rem; }
   .sig-hit-ore { font-size: 1.5rem; }
