@@ -344,6 +344,35 @@ input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(
 .pill.tier-uncommon { border-color: var(--good); color: var(--good); }
 .pill.tier-common { color: var(--text-dim); }
 
+/* ---------- Rareza de mineral (DATA.rarityFor): badge y punto de color ----------
+   Mismos tonos que los .pill.tier-* de señal de escáner (común apagado ->
+   legendario llamativo), para que la paleta de rareza sea consistente en
+   toda la app. Dos formatos (ver js/finder.js rarityBadgeHtml/rarityDotHtml):
+   pill con texto en cabeceras de ficha, punto de color en listas y tablas
+   densas donde el texto no cabe. */
+.rarity-pill {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  vertical-align: middle;
+}
+.rarity-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--text-dim);
+}
+.rarity-dot.tier-legendary { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
+.rarity-dot.tier-epic { background: #b06cf5; }
+.rarity-dot.tier-rare { background: var(--info); }
+.rarity-dot.tier-uncommon { background: var(--good); }
+.rarity-dot.tier-common { background: var(--text-dim); }
+
 /* ---------- Tables ---------- */
 .table-wrap { overflow-x: auto; background: var(--bg-alt); border: 1px solid var(--border-muted); border-radius: var(--radius); }
 table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }

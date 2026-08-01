@@ -10,6 +10,7 @@ const DATA = {
   refineries: {},      // estación -> {system, capacity_scu, yields}
   oreToLocations: {},  // ORE -> [{locKey, name, system, type, method, prob}]
   oreToSignals: {},    // ORE -> [señales]
+  oreRarity: {},        // ORE -> tier de rareza fiable ('common'…'legendary'), solo si existe
   uexByName: {},       // nombre UEX (minúsculas) -> commodity
   uexReady: false,
   marketplaceByBase: {}, // nombre base normalizado (minúsculas) -> [fila averages, ...]
@@ -70,6 +71,15 @@ const DATA = {
         (this.oreToSignals[sig.ore_hint] ??= []).push({ key: sigKey, ...sig });
       }
     }
+
+    // Mineral -> rareza (ver comentario de RARITY_TIERS_VALID sobre por qué
+    // se filtra el campo `tier` en vez de tomarlo tal cual).
+    this.oreRarity = {};
+    for (const sig of Object.values(this.scannerSignals)) {
+      if (sig.ore_hint && RARITY_TIERS_VALID.has(sig.tier)) {
+        this.oreRarity[sig.ore_hint] = sig.tier;
+      }
+    }
   },
 
   // Precios UEX: se cargan aparte para que la app funcione aunque la API falle.
@@ -114,6 +124,34 @@ const DATA = {
     const ref = this.uexRefinedFor(oreKey);
     if (ref && ref.price_sell > 0) return { price: ref.price_sell, refined: true };
     return null;
+  },
+
+  // Rareza del mineral: { tier, label } o null si mining_data.json no trae
+  // dato fiable para ese mineral (ver comentario largo junto a
+  // RARITY_TIERS_VALID — no se inventa, no hay fuente alternativa en la API
+  // de UEX). Síncrona: `oreRarity` se construye en `buildIndexes()`, ya
+  // disponible tras `await DATA.load()`.
+  rarityFor(oreKey) {
+    const tier = this.oreRarity[oreKey];
+    if (!tier) return null;
+    return { tier, label: RARITY_ES[tier] || tier };
+  },
+
+  // Mejores estaciones para refinar un mineral, ordenadas por bono de
+  // rendimiento descendente. `limit` (por defecto 3) acota el tamaño del
+  // resultado. Devuelve [] si el mineral no aparece en ninguna tabla de
+  // rendimiento (nunca null). Dato 100% local (`this.refineries`, ya cargado
+  // por `load()` desde mining_data.json): no depende de la API en vivo de
+  // UEX, así que está disponible de inmediato tras `await DATA.load()`, sin
+  // esperar a `loadUexPrices()`.
+  bestRefineryFor(oreKey, limit = 3) {
+    const rows = [];
+    for (const [station, s] of Object.entries(this.refineries)) {
+      const y = s.yields && s.yields[oreKey];
+      if (y) rows.push({ station, system: s.system, bonusPct: y.value });
+    }
+    rows.sort((a, b) => b.bonusPct - a.bonusPct);
+    return rows.slice(0, limit);
   },
 
   // Medias del Marketplace P2P (jugador-a-jugador): se cargan aparte, igual que
@@ -305,6 +343,36 @@ const METHOD_ES = {
   vehicle: "Vehículo (ROC)",
   hand: "Manual",
 };
+
+// Rareza: mining_data.json (base Strata) NO trae un campo `rarity` en `ores`
+// — se comprobó explícitamente, no está. Tampoco lo trae `commodities` de la
+// API de UEX (se revisó el payload real: ni `rarity` ni equivalente). La
+// única fuente real es el campo `tier` de `scanner_signals`, pero ese campo
+// está sobrecargado en el dato de Strata: para señales de contexto
+// `asteroid`/`ship`/`surface` es una rareza genuina (common/uncommon/rare/
+// epic/legendary); para contexto `fps`/`vehicle` el propio `mining_context`
+// se filtra en `tier` (p.ej. CARINITE trae tier:"fps" y tier:"vehicle", que
+// NO son rarezas). Por eso `DATA.buildIndexes()` solo acepta valores de este
+// set al construir `oreRarity` — así no se cuela un "vehicle" o "fps" como
+// si fuera rareza.
+//
+// Cobertura real (patch actual): 26 de 39 minerales tienen rareza fiable por
+// esta vía; los 13 restantes (gemas de cueva FPS/vehículo — Carinite,
+// Jaclium, Saldynium… — y el residuo de nave Inert Material) no tienen
+// ninguna fuente de rareza en los datos disponibles: `DATA.rarityFor()`
+// devuelve `null` para ellos, no se inventa un valor.
+const RARITY_TIERS_VALID = new Set(["common", "uncommon", "rare", "epic", "legendary"]);
+
+const RARITY_ES = {
+  common: "Común",
+  uncommon: "Poco común",
+  rare: "Raro",
+  epic: "Épico",
+  legendary: "Legendario",
+};
+
+// Orden ascendente de rareza, por si una vista necesita ordenar/agrupar.
+const RARITY_ORDER = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
 
 // Tramos de quality_tier del Marketplace de UEX -> etiqueta de rango (Q real
 // del listado). Tabla FIJA y GLOBAL (no depende del ítem): sacada del propio

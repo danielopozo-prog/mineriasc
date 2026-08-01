@@ -40,7 +40,13 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
 
 - Utilidades globales en `data.js`: `fmtNum(n, dec)` (formato es-ES), `esc(s)` (escape
   HTML — obligatorio para todo contenido dinámico), `showToast(msg)`, y los diccionarios
-  `LOC_TYPE_ES` / `METHOD_ES` (traducción de tipos y métodos).
+  `LOC_TYPE_ES` / `METHOD_ES` (traducción de tipos y métodos) / `RARITY_ES` +
+  `RARITY_ORDER` (rareza, ver `DATA.rarityFor()` abajo).
+- `DATA.rarityFor(oreKey)` → `{tier, label}` o `null` (rareza no disponible para ese
+  mineral). `DATA.bestRefineryFor(oreKey, limit=3)` → `[{station, system, bonusPct}]`
+  ordenado descendente, `[]` si no hay dato. Ambos son síncronos y están disponibles
+  justo tras `await DATA.load()` (dato 100% local, sin dependencia de la API en vivo de
+  UEX) — detalle de la fuente y sus huecos en `.claude/guides/datos-juego.md`.
 - Sistema visual (`css/styles.css`): tema negro casi puro (`--bg: #0a0a0a`) con acento
   rojo carmesí (`--accent: #d81f2b`, sustituye al ámbar histórico) y acento secundario
   naranja (`--accent-2`) para kickers de sección (`.kicker`, texto pequeño en mayúsculas

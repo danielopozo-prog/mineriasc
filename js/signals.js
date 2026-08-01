@@ -218,6 +218,7 @@ const Signals = {
           <th class="sig-loc-mineral-cell" scope="row">
             <div class="sig-loc-mineral-inner">
               <span class="sig-loc-swatch"></span>
+              ${rarityDotHtml(r.oreKey)}
               <span class="sig-loc-mineral-name">${esc(r.oreName)}</span>
               ${r.multiRow ? `<span class="sig-loc-mineral-context">${esc(r.contextLabel)}</span>` : ""}
               ${this.favStarHtml(r.oreKey)}
@@ -316,7 +317,7 @@ const Signals = {
       const n = DATA.oreToSignals[key].length;
       return `<div class="side-item ${this.selected.has(key) ? "active" : ""}" data-ore="${esc(key)}">
         ${this.favStarHtml(key)}
-        <span class="side-item-name">${esc(ore.display_name)}</span>
+        <span class="side-item-name">${rarityDotHtml(key)}${esc(ore.display_name)}</span>
         <span class="sub">${n} señal${n === 1 ? "" : "es"}</span>
       </div>`;
     };
@@ -446,6 +447,7 @@ const Signals = {
       <div class="sig-mineral-section ${multi ? "sig-mineral-section-multi" : ""}">
         <div class="detail-head-row">
           <h3>${esc(ore.display_name)}</h3>
+          ${rarityBadgeHtml(oreKey)}
           ${this.favStarHtml(oreKey, "fav-star-lg")}
           ${removeBtn}
         </div>

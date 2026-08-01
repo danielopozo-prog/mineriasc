@@ -1,6 +1,27 @@
 /* Pestaña «Buscador»: lista de minerales con búsqueda, y ficha de detalle
    con dificultad, precios UEX en vivo, ubicaciones y señales de escáner. */
 
+/* ---------- Rareza (DATA.rarityFor): badge compartido entre vistas ----------
+   Se define aquí porque finder.js es el primer módulo de vista que carga
+   index.html (justo después de data.js) — locations.js y signals.js, que
+   también lo usan, cargan después y lo encuentran ya disponible como global.
+   Dos formatos, según cuánto sitio hay en cada contexto (ver CLAUDE.md):
+   - rarityBadgeHtml: pill con el texto de la rareza (cabeceras de ficha,
+     poco densas).
+   - rarityDotHtml: solo un punto de color con title (listas y matriz,
+     donde el texto no cabe o rompe la alineación). */
+function rarityDotHtml(oreKey) {
+  const r = DATA.rarityFor(oreKey);
+  if (!r) return "";
+  return `<span class="rarity-dot tier-${esc(r.tier)}" title="Rareza: ${esc(r.label)}" aria-label="Rareza: ${esc(r.label)}"></span>`;
+}
+
+function rarityBadgeHtml(oreKey) {
+  const r = DATA.rarityFor(oreKey);
+  if (!r) return "";
+  return `<span class="pill rarity-pill tier-${esc(r.tier)}">${esc(r.label)}</span>`;
+}
+
 const Finder = {
   selected: null,
 
@@ -22,7 +43,7 @@ const Finder = {
         const best = DATA.bestSellFor(key);
         const price = best ? fmtNum(best.price) + " aUEC" : "";
         return `<div class="side-item ${key === this.selected ? "active" : ""}" data-ore="${key}">
-          <span>${esc(ore.display_name)}</span>
+          <span class="side-item-name">${rarityDotHtml(key)}${esc(ore.display_name)}</span>
           <span class="sub">${price}</span>
         </div>`;
       })
@@ -50,6 +71,7 @@ const Finder = {
     const locs = DATA.oreToLocations[oreKey] || [];
     const sigs = DATA.oreToSignals[oreKey] || [];
     const mkt = DATA.marketplaceAvgFor(oreKey);
+    const bestRef = DATA.bestRefineryFor(oreKey, 3);
 
     const locRows = locs
       .map(
@@ -72,8 +94,48 @@ const Finder = {
       .join(" ");
 
     el.innerHTML = `
-      <h3>${esc(ore.display_name)}</h3>
+      <div class="detail-head-row">
+        <h3>${esc(ore.display_name)}</h3>
+        ${rarityBadgeHtml(oreKey)}
+      </div>
       <p class="subtitle">${esc(METHOD_ES[ore.mining_method] || ore.mining_method)} · forma: ${esc(ore.form || "—")}</p>
+
+      <h4>Dificultad de minado</h4>
+      <div class="stat-grid">
+        <div class="stat"><div class="label">Inestabilidad</div><div class="value ${d.instability >= 500 ? "bad" : ""}">${fmtNum(d.instability)}</div></div>
+        <div class="stat"><div class="label">Resistencia</div><div class="value">${fmtNum(d.resistance, 2)}</div></div>
+        <div class="stat"><div class="label">Mult. explosión</div><div class="value ${d.explosion_multiplier >= 50 ? "bad" : ""}">×${fmtNum(d.explosion_multiplier, 1)}</div></div>
+        <div class="stat"><div class="label">Factor clúster</div><div class="value">${fmtNum(d.cluster_factor, 2)}</div></div>
+      </div>
+
+      <h4>Dónde encontrarlo (${locs.length} ubicaciones)</h4>
+      ${
+        locs.length
+          ? `<div class="table-wrap"><table>
+              <thead><tr><th>Ubicación</th><th>Sistema</th><th>Tipo</th><th>Método</th><th>Prob. rel.</th></tr></thead>
+              <tbody>${locRows}</tbody></table></div>`
+          : '<span class="hint">Sin datos de ubicación para este mineral.</span>'
+      }
+
+      <h4>Señales de escáner (${sigs.length})</h4>
+      <div>${sigPills || '<span class="hint">Sin señales específicas registradas.</span>'}</div>
+
+      ${
+        bestRef.length
+          ? `<h4>Dónde refinarlo mejor</h4>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Estación</th><th>Sistema</th><th>Bono</th></tr></thead>
+              <tbody>${bestRef
+                .map(
+                  (r) => `<tr>
+                    <td>${esc(r.station)}</td>
+                    <td>${esc(r.system)}</td>
+                    <td class="num ${r.bonusPct > 0 ? "good" : r.bonusPct < 0 ? "bad" : ""}">${r.bonusPct > 0 ? "+" : ""}${fmtNum(r.bonusPct)}%</td>
+                  </tr>`
+                )
+                .join("")}</tbody></table></div>`
+          : ""
+      }
 
       <h4>Precios (UEX, en vivo)</h4>
       <div class="stat-grid" id="ore-prices">
@@ -115,26 +177,6 @@ const Finder = {
                 )
                 .join("")}</tbody></table></div>`
           : ""
-      }
-
-      <h4>Dificultad de minado</h4>
-      <div class="stat-grid">
-        <div class="stat"><div class="label">Inestabilidad</div><div class="value ${d.instability >= 500 ? "bad" : ""}">${fmtNum(d.instability)}</div></div>
-        <div class="stat"><div class="label">Resistencia</div><div class="value">${fmtNum(d.resistance, 2)}</div></div>
-        <div class="stat"><div class="label">Mult. explosión</div><div class="value ${d.explosion_multiplier >= 50 ? "bad" : ""}">×${fmtNum(d.explosion_multiplier, 1)}</div></div>
-        <div class="stat"><div class="label">Factor clúster</div><div class="value">${fmtNum(d.cluster_factor, 2)}</div></div>
-      </div>
-
-      <h4>Señales de escáner (${sigs.length})</h4>
-      <div>${sigPills || '<span class="hint">Sin señales específicas registradas.</span>'}</div>
-
-      <h4>Dónde encontrarlo (${locs.length} ubicaciones)</h4>
-      ${
-        locs.length
-          ? `<div class="table-wrap"><table>
-              <thead><tr><th>Ubicación</th><th>Sistema</th><th>Tipo</th><th>Método</th><th>Prob. rel.</th></tr></thead>
-              <tbody>${locRows}</tbody></table></div>`
-          : '<span class="hint">Sin datos de ubicación para este mineral.</span>'
       }
     `;
 

@@ -206,6 +206,28 @@ def main():
     tier_labels_ok = bool(m) and "5: \"Q800-899\"" in (m.group(1) if m else "")
     check("data.js: tramo quality_tier=5 es Q800-899 (verificado, no lineal)", tier_labels_ok)
 
+    # --- rareza de mineral (oreRarity / rarityFor / RARITY_ES) ----------
+    # Fuente: scanner_signals.tier, filtrado a valores de rareza genuinos
+    # (ver comentario largo junto a RARITY_TIERS_VALID en data.js) — NO
+    # confundir con los pseudo-tiers "fps"/"vehicle" que ese mismo campo
+    # trae en mining_data.json para otro tipo de señal.
+    check("data.js: RARITY_TIERS_VALID definido", "RARITY_TIERS_VALID" in data_js)
+    check("data.js: RARITY_ES cubre las 5 rarezas conocidas",
+          all(f'{t}:' in data_js.replace('"', '') for t in
+              ("common", "uncommon", "rare", "epic", "legendary")))
+    check("data.js: rarityFor definido", "rarityFor(oreKey)" in data_js)
+    check("data.js: oreRarity se construye en buildIndexes filtrando por RARITY_TIERS_VALID",
+          re.search(r"oreRarity\[.*?\]\s*=.*RARITY_TIERS_VALID", data_js, re.S) is not None
+          or re.search(r"RARITY_TIERS_VALID\.has\(sig\.tier\)", data_js) is not None)
+
+    # --- mejor refinería por mineral (bestRefineryFor) -------------------
+    # 100% local (this.refineries, ya cargado desde mining_data.json): no
+    # depende de ninguna llamada en vivo a UEX.
+    check("data.js: bestRefineryFor definido", "bestRefineryFor(oreKey" in data_js)
+    check("data.js: bestRefineryFor ordena por bonusPct descendente",
+          re.search(r"bestRefineryFor[\s\S]{0,400}sort\(\(a,\s*b\)\s*=>\s*b\.bonusPct\s*-\s*a\.bonusPct\)", data_js)
+          is not None)
+
     # el estatico sigue siendo estatico (todas las paginas, todos los CSS)
     check("sin package.json (sin build)", not (ROOT / "package.json").exists())
     cdn_markers = ("cdn.", "unpkg", "jsdelivr", "fonts.googleapis", "fonts.gstatic")

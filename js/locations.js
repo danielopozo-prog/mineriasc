@@ -69,7 +69,7 @@ const Locations = {
             const ore = DATA.ores[e.ore];
             const best = DATA.bestSellFor(e.ore);
             return `<tr>
-              <td>${esc(ore?.display_name || e.ore)}</td>
+              <td>${rarityDotHtml(e.ore)}${esc(ore?.display_name || e.ore)}</td>
               <td class="num">${fmtNum(e.relative_probability, 1)}%</td>
               <td class="num">${best ? fmtNum(best.price) + " aUEC" : "—"}</td>
             </tr>`;

@@ -270,6 +270,7 @@ const Inventory = {
         const scu = items.filter((e) => this.unitOf(e) === "SCU").reduce((s, e) => s + e.qty, 0);
         const val = items.reduce((s, e) => s + (this.valueOf(e) || 0), 0);
         const hasValuable = items.some((e) => !this.isGeneric(e));
+        const oreEntry = items.find((e) => !this.isGeneric(e));
         const rows = items
           .map((e) => {
             const note = this.isGeneric(e) && e.note ? ` <span class="meta">· ${esc(e.note)}</span>` : "";
@@ -288,7 +289,7 @@ const Inventory = {
         const totalsTxt = `${fmtNum(scu, 2)} SCU · ${hasValuable ? fmtNum(val) + " aUEC" : "sin valorar"}`;
         return `<div class="group">
           <div class="group-head">
-            <span>${esc(name)}</span>
+            <span>${oreEntry ? rarityDotHtml(oreEntry.ore) : ""}${esc(name)}</span>
             <span>${totalsTxt}</span>
           </div>${rows}</div>`;
       })
@@ -337,6 +338,7 @@ const Inventory = {
             const subQty = subItems.reduce((s, e) => s + e.qty, 0);
             const subVal = subItems.reduce((s, e) => s + (this.valueOf(e) || 0), 0);
             const subValuable = subItems.some((e) => !this.isGeneric(e));
+            const subOreEntry = subItems.find((e) => !this.isGeneric(e));
             const unit = this.unitOf(subItems[0]);
             const rows = subItems
               .map((e) => {
@@ -354,7 +356,7 @@ const Inventory = {
               .join("");
             return `<div class="inv-box-sub">
               <div class="inv-box-sub-head">
-                <span>${esc(label)}</span>
+                <span>${subOreEntry ? rarityDotHtml(subOreEntry.ore) : ""}${esc(label)}</span>
                 <span>${fmtNum(subQty, 2)} ${esc(unit)}${subValuable ? " · " + fmtNum(subVal) + " aUEC" : ""}</span>
               </div>
               ${rows}

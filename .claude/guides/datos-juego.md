@@ -20,8 +20,8 @@ y si UEX renombró commodities (guía uex-api.md).
 | `ores` | 39 minerales: `display_name`, `uex_name`, `mining_method`, `difficulty{instability, resistance, explosion_multiplier, cluster_factor…}` | Buscador, Inventario |
 | `locations` | 86 ubicaciones: `display_name`, `system`, `type`, `has_refinery` | detalle de ubicación |
 | `location_ores` | 48 zonas con `ores.{ship,fps,vehicle}[] = {ore, relative_probability}` | Ubicaciones + índice `oreToLocations` |
-| `scanner_signals` | 76 señales: `signal_value`, `tier`, `ore_hint`, `mining_context` | pills del Buscador |
-| `refineries.stations` | Estación → `{system, capacity_scu, yields{ORE: {value…}}}` (bonos % de rendimiento) | tabla de Refinería |
+| `scanner_signals` | 76 señales: `signal_value`, `tier`, `ore_hint`, `mining_context` | pills del Buscador; también fuente de rareza (`DATA.oreRarity`, ver abajo) |
+| `refineries.stations` | Estación → `{system, capacity_scu, yields{ORE: {value…}}}` (bonos % de rendimiento) | tabla de Refinería; también fuente de `DATA.bestRefineryFor()` |
 
 Claves presentes pero **no usadas aún**: `compositions`, `cave_compositions`,
 `mining_params`, `equipment` (láseres/módulos/cargas — candidata a pestaña futura),
@@ -32,9 +32,21 @@ Claves presentes pero **no usadas aún**: `compositions`, `cave_compositions`,
 - Las claves de mineral son MAYÚSCULAS (`QUANTANIUM`); las de `location_ores` no
   coinciden con las de `locations` (`GLACIUM` vs `AARON_HALO`) — el cruce se hace por
   `name`/`display_name`, no por clave.
-- `ore_locations` (singular invertido) y `computed` existen pero vienen **vacíos**: no
-  construir nada sobre ellos.
+- `ore_locations` (singular invertido) existe pero viene **vacío**: no construir nada
+  sobre él. `computed.best_mining_location` también viene vacío, pero
+  `computed.best_refinery` **sí trae datos** (mapa ORE → única mejor estación) — no se
+  usa como fuente: `DATA.bestRefineryFor()` deriva el top-3 directamente de
+  `refineries.stations` (más flexible y verificado contra ese mismo campo, ver
+  `.claude/guides/uex-api.md`).
 - Los `yields` de refinería son enteros con signo (± %), no multiplicadores.
+- **No existe un campo `rarity`/`rareza` en `ores`** (comprobado: no está, ni en
+  `mining_data.json` ni en `commodities` de la API de UEX). La única fuente real de
+  rareza es `scanner_signals[*].tier`, y solo es fiable para los valores
+  `common/uncommon/rare/epic/legendary` (contextos `ship`/`asteroid`/`surface`): para
+  contextos `fps`/`vehicle` ese mismo campo `tier` repite el propio `mining_context`
+  ("fps", "vehicle"), que NO es una rareza y hay que descartar explícitamente. Detalle
+  completo, cobertura real (26/39 minerales) y motivo de los 13 sin dato en el
+  comentario junto a `RARITY_TIERS_VALID` en `js/data.js`.
 
 ## Catálogo ampliado de ubicaciones (`data/uex_locations.json`)
 
