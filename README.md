@@ -19,6 +19,10 @@ python -m http.server 8123
 
 Y abre <http://localhost:8123>. También puede desplegarse tal cual en GitHub Pages.
 
+**Windows, sin usar la terminal:** haz doble clic en `Iniciar servidor.bat`. Comprueba que
+Python está instalado, levanta el servidor en el puerto 8123 y abre el navegador
+automáticamente. Deja la ventana abierta mientras uses la app; para pararlo, ciérrala.
+
 ## Fuentes de datos
 
 | Dato | Fuente | Actualización |
