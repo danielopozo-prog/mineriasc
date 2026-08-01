@@ -90,7 +90,10 @@
   --f-body:"Segoe UI",system-ui,sans-serif;
 
   --notch:14px;
-  --wrap:1180px;
+  /* Coherente con el max-width de css/styles.css (Minería SC): más ancho en
+     pantalla completa de escritorio, las parrillas de tarjetas (auto-fill)
+     ya absorben el espacio extra con más columnas sin romperse en móvil. */
+  --wrap:1500px;
 }
 
 *,*::before,*::after{box-sizing:border-box}

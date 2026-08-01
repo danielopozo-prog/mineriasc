@@ -69,6 +69,10 @@
   --radius-sm: 6px;
   --font-display: "Teko", "Saira Condensed", "Segoe UI", system-ui, sans-serif;
   --font-ui: "Saira Condensed", "Segoe UI", system-ui, sans-serif;
+  /* Para cifras densas (matriz de señales, múltiplos): la condensada Teko/Saira
+     es difícil de leer dígito a dígito cuando hay muchos números juntos. Se
+     usa el mismo stack sans del cuerpo, siempre con tabular-nums al lado. */
+  --font-num: "Segoe UI", system-ui, sans-serif;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -148,7 +152,7 @@ body {
 }
 
 /* ---------- Layout ---------- */
-main { flex: 1; padding: 20px 24px; max-width: 1300px; width: 100%; margin: 0 auto; }
+main { flex: 1; padding: 20px 24px; max-width: 1600px; width: 100%; margin: 0 auto; }
 
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
@@ -191,6 +195,12 @@ input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(
   align-items: start;
 }
 @media (max-width: 800px) { .split { grid-template-columns: 1fr; } }
+/* .split fuerza display:grid como regla de autor, que en la cascada gana
+   siempre al [hidden] de hoja de estilos del user-agent (display:none),
+   sin importar especificidad ni orden: por eso Signals.selectLocation()
+   podía poner sig-split.hidden = true y el bloque seguía visible bajo la
+   matriz de ubicación. Se restaura aquí el comportamiento esperado. */
+.split[hidden] { display: none; }
 
 /* ---------- Side list ---------- */
 .side-list {
@@ -613,7 +623,7 @@ footer a { color: var(--info); text-decoration: none; }
 }
 .sig-hit-mult { color: var(--accent-2); font-family: var(--font-ui); font-weight: 600; }
 .sig-hit-value {
-  font-family: var(--font-display);
+  font-family: var(--font-num);
   font-size: 2rem;
   font-weight: 600;
   line-height: 1.2;
@@ -703,7 +713,7 @@ footer a { color: var(--info); text-decoration: none; }
   font-size: 0.6rem;
 }
 .mult-value {
-  font-family: var(--font-display);
+  font-family: var(--font-num);
   font-size: 2.1rem;
   font-weight: 600;
   line-height: 1.15;
@@ -835,6 +845,14 @@ footer a { color: var(--info); text-decoration: none; }
   top: 0;
   z-index: 2;
 }
+/* Cabeceras ×15..×1: son cifras (no la etiqueta "Mineral"), mismo criterio
+   de legibilidad que las celdas de la matriz — se excluye .sig-loc-mineral-h. */
+.sig-loc-matrix thead th:not(.sig-loc-mineral-h) {
+  font-family: var(--font-num);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: none;
+}
 .sig-loc-mineral-h {
   text-align: left;
   left: 0;
@@ -875,8 +893,8 @@ footer a { color: var(--info); text-decoration: none; }
 .sig-loc-row.selected td,
 .sig-loc-row.selected .sig-loc-mineral-cell { background: var(--accent-soft); }
 .sig-loc-cell {
-  font-family: var(--font-display);
-  font-size: 1rem;
+  font-family: var(--font-num);
+  font-size: 1.15rem;
   font-weight: 600;
   color: var(--text);
 }
@@ -887,5 +905,5 @@ footer a { color: var(--info); text-decoration: none; }
 }
 @media (min-width: 1100px) {
   .sig-loc-matrix { min-width: 0; }
-  .sig-loc-cell { font-size: 1.1rem; }
+  .sig-loc-cell { font-size: 1.35rem; }
 }
