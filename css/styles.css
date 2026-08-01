@@ -632,15 +632,19 @@ footer a { color: var(--info); text-decoration: none; }
 }
 @media (min-width: 700px) {
   .mult-value { font-size: 2.4rem; }
-  .mult-grid-rest .mult-value { font-size: 1.2rem; }
+  /* ×6..15 en escritorio: 10 columnas fijas para que quepan siempre en una sola fila. */
+  .mult-grid-rest { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+  .mult-grid-rest .mult-card { padding: 4px 3px; }
+  .mult-grid-rest .mult-value { font-size: 1.05rem; }
 }
 @media (min-width: 1100px) {
   .mult-grid-main { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-  .mult-grid-rest { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+  .mult-grid-rest { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 8px; }
   .mult-grid-main .mult-card { padding: 14px 10px; }
   .mult-grid-main .mult-label { font-size: 0.85rem; }
+  .mult-grid-rest .mult-card { padding: 6px 4px; }
   .mult-value { font-size: 3.2rem; }
-  .mult-grid-rest .mult-value { font-size: 1.6rem; }
+  .mult-grid-rest .mult-value { font-size: 1.3rem; }
   .mult-grid-rest .mult-label { font-size: 0.7rem; }
   .sig-hit-value { font-size: 2.6rem; }
   .sig-hit-ore { font-size: 1.5rem; }
