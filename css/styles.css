@@ -310,6 +310,18 @@ input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(
   letter-spacing: 1px;
   color: var(--accent);
 }
+/* Sub-cabecera dentro de una sección h4 (p.ej. separar "por SCU" de "por
+   unidad de venta" en el marketplace de un mineral): más discreta que h4,
+   que ya marca el bloque grande con el color de acento. */
+.detail h5 {
+  margin: 14px 0 6px;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
 
 .stat-grid {
   display: grid;
@@ -394,6 +406,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 td.good { color: var(--good); }
 td.bad { color: var(--bad); }
 tr.low-confidence td { opacity: 0.55; }
+tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
 
 /* ---------- Cards ---------- */
 .cards-row {

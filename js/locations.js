@@ -64,13 +64,17 @@ const Locations = {
     const methodBlocks = Object.entries(loc.ores || {})
       .map(([method, entries]) => {
         const rows = [...entries]
-          .sort((a, b) => b.relative_probability - a.relative_probability)
+          .sort((a, b) => (b.relative_probability ?? -1) - (a.relative_probability ?? -1))
           .map((e) => {
-            const ore = DATA.ores[e.ore];
+            const unidentified = !DATA.ores[e.ore];
             const best = DATA.bestSellFor(e.ore);
-            return `<tr>
-              <td>${rarityDotHtml(e.ore)}${esc(ore?.display_name || e.ore)}</td>
-              <td class="num">${fmtNum(e.relative_probability, 1)}%</td>
+            const prob =
+              e.relative_probability == null
+                ? '<span class="hint">Sin medir</span>'
+                : `${fmtNum(e.relative_probability, 1)}%`;
+            return `<tr class="${unidentified ? "unidentified-ore" : ""}">
+              <td>${rarityDotHtml(e.ore)}${esc(DATA.oreLabel(e.ore))}</td>
+              <td class="num">${prob}</td>
               <td class="num">${best ? fmtNum(best.price) + " aUEC" : "—"}</td>
             </tr>`;
           })

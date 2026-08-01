@@ -1,6 +1,58 @@
 /* Carga de mining_data.json (datos de juego, base Strata) y
    construcción de índices para las vistas. */
 
+// Correcciones puntuales al nombre UEX "en bruto" de un mineral (el que debe
+// usar uexFor para encontrar la commodity BRUTA), para cuando
+// `ore.uex_name`/`ore.display_name` (mining_data.json, dato generado, nunca
+// se edita a mano) no coinciden con el nombre real de la commodity/ítem en la
+// API de UEX. Los cuatro casos están verificados contra la API en vivo
+// (commodities + marketplace_prices_averages_all, ver .claude/guides/uex-api.md):
+//   - CARINITEPURE: Strata trae `uex_name: null` y `display_name: "Carinite Pure"`;
+//     UEX real es "Carinite (Pure)" (con paréntesis; no hay variante refinada
+//     separada — bruto y "refinado" son la misma commodity).
+//   - LINDINIUM / SAVRILIUM: `uex_name` trae "Lindinium Ore"/"Savrilium Ore"
+//     (sin paréntesis); el bruto real en UEX es "Lindinium (Ore)"/
+//     "Savrilium (Ore)". Sin este override, uexFor no encuentra el bruto y
+//     cae al fallback de `display_name` ("Lindinium"/"Savrilium"), que por
+//     COINCIDENCIA es el nombre exacto de la commodity REFINADA — devolviendo
+//     el precio refinado etiquetado como "en bruto" en bestSellFor/Buscador.
+//     Bug real detectado y corregido, no solo cosmético.
+//   - ICE: `uex_name` trae "Raw Ice" (orden de palabras invertido, sin
+//     paréntesis); el bruto real es "Ice (Raw)". No existe variante refinada
+//     (el hielo no se refina) — uexRefinedFor sigue devolviendo null para
+//     ICE, correctamente.
+//   - SALDYNIUM: `uex_name` es null y `display_name` es "Saldynium" (sin
+//     sufijo); el bruto real es "Saldynium (Ore)", y tampoco existe variante
+//     refinada separada.
+// Añadir aquí cualquier caso nuevo que aparezca tras un parche — no tocar
+// mining_data.json.
+const UEX_NAME_OVERRIDES = {
+  CARINITEPURE: "Carinite (Pure)",
+  LINDINIUM: "Lindinium (Ore)",
+  SAVRILIUM: "Savrilium (Ore)",
+  ICE: "Ice (Raw)",
+  SALDYNIUM: "Saldynium (Ore)",
+};
+
+// Nombre BASE de una commodity UEX (el mineral REFINADO, o el propio ítem
+// cuando no hay distinción bruto/refinado): quita el sufijo de "en bruto" que
+// UEX usa de tres formas distintas según el mineral (las tres verificadas
+// contra la API real, no inventadas — ver tabla completa en uex-api.md):
+//   1) entre paréntesis al final   — "Gold (Ore)", "Quantainium (Raw)" (mayoría)
+//   2) sin paréntesis al final     — "Lindinium Ore", "Savrilium Ore"
+//   3) como prefijo                — "Raw Ice"
+// Usado por uexRefinedFor y marketplaceAvgFor (mismo criterio en los dos,
+// documentado en uex-api.md). No añadir un 4º patrón sin volver a verificar
+// contra `commodities`/`marketplace_prices_averages_all` en vivo: el objetivo
+// es SOLO cubrir casos reales, no adivinar.
+function uexBaseName(rawName) {
+  return rawName
+    .replace(/\s*\((Ore|Raw)\)\s*$/i, "")
+    .replace(/\s+(Ore|Raw)\s*$/i, "")
+    .replace(/^\s*Raw\s+/i, "")
+    .toLowerCase();
+}
+
 const DATA = {
   raw: null,           // JSON completo
   ores: {},            // clave -> mineral
@@ -96,10 +148,14 @@ const DATA = {
     this.uexReady = true;
   },
 
-  // Commodity UEX del mineral en bruto (por uex_name, o display_name como alternativa)
+  // Commodity UEX del mineral en bruto (por override conocido, uex_name, o
+  // display_name como alternativa — ver UEX_NAME_OVERRIDES y uexBaseName más
+  // abajo para el porqué de cada caso).
   uexFor(oreKey) {
     const ore = this.ores[oreKey];
     if (!ore) return null;
+    const override = UEX_NAME_OVERRIDES[oreKey];
+    if (override) return this.uexByName[override.toLowerCase()] || null;
     return (
       this.uexByName[(ore.uex_name || "").toLowerCase()] ||
       this.uexByName[(ore.display_name || "").toLowerCase()] ||
@@ -107,14 +163,13 @@ const DATA = {
     );
   },
 
-  // Commodity UEX del mineral refinado: el uex_name sin el sufijo « (Ore)» / « (Raw)»
+  // Commodity UEX del mineral refinado: nombre base (ver uexBaseName) del
+  // override/uex_name/display_name que corresponda.
   uexRefinedFor(oreKey) {
     const ore = this.ores[oreKey];
     if (!ore) return null;
-    const base = (ore.uex_name || ore.display_name || "")
-      .replace(/\s*\((Ore|Raw)\)\s*$/i, "")
-      .toLowerCase();
-    return this.uexByName[base] || null;
+    const raw = UEX_NAME_OVERRIDES[oreKey] || ore.uex_name || ore.display_name || "";
+    return this.uexByName[uexBaseName(raw)] || null;
   },
 
   // Mejor precio de venta conocido: en bruto si UEX tiene media, si no el refinado
@@ -124,6 +179,22 @@ const DATA = {
     const ref = this.uexRefinedFor(oreKey);
     if (ref && ref.price_sell > 0) return { price: ref.price_sell, refined: true };
     return null;
+  },
+
+  // Etiqueta legible de un mineral por su clave: `display_name` si está
+  // catalogado en `ores`. Para las claves "UNKNOWN_<hash>" que trae
+  // `location_ores` (nodos de minado FPS que el propio Strata no ha podido
+  // identificar todavía — panel_confirmed:false para TODAS ellas, verificado:
+  // 7 hashes distintos, 129 de 457 filas de location_ores en el parche
+  // actual, ver .claude/guides/datos-juego.md) devuelve una etiqueta genérica
+  // en vez de la clave hash cruda: el usuario nunca debe ver un
+  // "UNKNOWN_xxxxxxxx" en pantalla. Úsese en cualquier vista que renderice un
+  // `ore` de `location_ores` en vez de leer `DATA.ores[key]?.display_name`
+  // directamente (ver locations.js).
+  oreLabel(oreKey) {
+    const ore = this.ores[oreKey];
+    if (ore) return ore.display_name || oreKey;
+    return /^UNKNOWN_/i.test(oreKey) ? "Mineral sin identificar" : oreKey;
   },
 
   // Rareza del mineral: { tier, label } o null si mining_data.json no trae
@@ -169,6 +240,9 @@ const DATA = {
       if (!key) continue;
       (this.marketplaceByBase[key] ??= []).push(r);
     }
+    // El orden fino (scu primero, luego resto de units, por tier dentro de
+    // cada unidad) lo aplica marketplaceAvgFor en cada consulta — aquí basta
+    // con un orden estable de partida por tier.
     for (const list of Object.values(this.marketplaceByBase)) {
       list.sort((a, b) => a.quality_tier - b.quality_tier);
     }
@@ -215,23 +289,57 @@ const DATA = {
     return this._refreshInFlight;
   },
 
-  // Medias del Marketplace P2P del mineral en bruto, un tramo de calidad por fila,
-  // ordenadas de menor a mayor calidad. El marketplace agrupa el bruto bajo el
-  // nombre del ítem BASE (el refinado, sin sufijo « (Ore)»/« (Raw)»): misma
-  // normalización que uexRefinedFor. Devuelve [] si no hay datos (nunca null),
-  // para que el consumidor pueda iterar sin comprobar null antes.
+  // Medias del Marketplace P2P del mineral en bruto: una fila por combinación
+  // (unidad de venta × tramo de calidad). El marketplace agrupa el bruto bajo
+  // el nombre del ítem BASE (el refinado): misma normalización que
+  // uexRefinedFor (ver uexBaseName y UEX_NAME_OVERRIDES). Devuelve [] si no
+  // hay datos (nunca null), para que el consumidor pueda iterar sin comprobar
+  // null antes.
+  //
+  // CONTRATO (cambiado tras el parche 4.9 — antes solo devolvía filas por
+  // SCU): cada fila trae
+  //   { unit, qualityTier, qualityLabel, priceAvg, priceAvgWeek,
+  //     priceAvgMonth, listingsCount }
+  // `unit` es la unidad de venta real del anuncio ("scu", "unit", "pack",
+  // "box", "cscu", "dozen", "hundred", "set", "stack"…). `priceAvg` (antes
+  // `priceAvgScu`, renombrado a propósito — no queda alias del nombre viejo:
+  // dejarlo habría insinuado que sigue siendo siempre precio por SCU) es el
+  // precio medio por UNA unidad de `unit`, NUNCA por SCU salvo que
+  // `unit === "scu"`. Precio por SCU y precio por unidad suelta son
+  // magnitudes distintas (una gema se vende por bolsas de decenas, no a
+  // granel) — cualquier vista DEBE mostrar `unit` junto al precio, nunca
+  // asumir SCU.
+  //
+  // Orden de las filas: primero todas las de `unit === "scu"` (por tier
+  // ascendente), después el resto de unidades agrupadas alfabéticamente por
+  // `unit` (por tier ascendente dentro de cada una). Así el consumidor puede
+  // pintar el grupo SCU (el caso mayoritario, 26 de 39 minerales) primero sin
+  // tener que reagrupar él mismo.
+  //
+  // Devuelve [] solo si el mineral no tiene NINGUNA actividad P2P (ninguna
+  // unidad, ninguna operación de venta): en el parche 4.9 eso es únicamente
+  // ICE e INERTMATERIAL (ver uex-api.md). Ya NO devuelve [] para los 13
+  // minerales que solo se trafican en unidades pequeñas (Carinite, Carinite
+  // (Pure), Aphorite, Beradom, Dolivine, Feynmaline, Glacosite, Hadanite,
+  // Jaclium, Janalite, Sadaryx, Saldynium, Tin): esas filas ahora se
+  // incluyen con su `unit` real.
   marketplaceAvgFor(oreKey) {
     const ore = this.ores[oreKey];
     if (!ore) return [];
-    const base = (ore.uex_name || ore.display_name || "")
-      .replace(/\s*\((Ore|Raw)\)\s*$/i, "")
-      .toLowerCase();
-    const rows = this.marketplaceByBase[base];
+    const raw = UEX_NAME_OVERRIDES[oreKey] || ore.uex_name || ore.display_name || "";
+    const rows = this.marketplaceByBase[uexBaseName(raw)];
     if (!rows || !rows.length) return [];
-    return rows.map((r) => ({
+    const sorted = [...rows].sort((a, b) => {
+      if (a.unit === b.unit) return a.quality_tier - b.quality_tier;
+      if (a.unit === "scu") return -1;
+      if (b.unit === "scu") return 1;
+      return a.unit.localeCompare(b.unit) || a.quality_tier - b.quality_tier;
+    });
+    return sorted.map((r) => ({
+      unit: r.unit,
       qualityTier: r.quality_tier,
       qualityLabel: QUALITY_TIER_LABELS[r.quality_tier] || `Q${r.quality_tier}`,
-      priceAvgScu: Number(r.price_avg),
+      priceAvg: Number(r.price_avg),
       priceAvgWeek: Number(r.price_avg_week),
       priceAvgMonth: Number(r.price_avg_month),
       listingsCount: r.listings_count,

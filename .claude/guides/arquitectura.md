@@ -162,7 +162,7 @@ Ejemplo real (usado para verificar que `marketplaceAveragesAll` sirve datos):
 ```bash
 python .claude/scripts/browser_check.py \
     --wait "DATA.marketplaceReady === true" \
-    --eval "DATA.marketplaceAvgFor('COPPER').find(t => t.qualityTier === 5).priceAvgScu"
+    --eval "DATA.marketplaceAvgFor('COPPER').find(t => t.unit === 'scu' && t.qualityTier === 5).priceAvg"
 ```
 
 No sustituye a probar las pestañas a ojo cuando el cambio es de interacción/visual —

@@ -182,14 +182,65 @@ def main():
     check("uex.js: marketplaceAveragesAll definido", "marketplaceAveragesAll" in uex_js)
     check("uex.js: marketplaceAveragesAll expuesto en el objeto devuelto",
           re.search(r"return\s*\{[^}]*marketplaceAveragesAll[^}]*\}", uex_js, re.S) is not None)
-    check("uex.js: marketplace_prices_averages_all filtra scu+sell antes de cachear",
-          "unit === \"scu\"" in uex_js and "operation === \"sell\"" in uex_js,
-          "el payload sin filtrar (~1,3 MB) agota la cuota de localStorage")
+    check("uex.js: marketplace_prices_averages_all filtra sell antes de cachear",
+          "operation === \"sell\"" in uex_js,
+          "el payload sin filtrar (~1,3 MB, todos los items del juego) agota la cuota de localStorage")
+    # Desde el parche 4.9 ya NO se filtra por unit === "scu": eso descartaba
+    # anuncios reales de 13 minerales que solo se trafican en unidades sueltas
+    # (Carinite, Tin...). No reintroducir ese filtro sin volver a medir contra
+    # la API en vivo (ver comentario largo en uex.js y uex-api.md).
+    check("uex.js: NO reintroduce el filtro unit===scu (excluía 13 minerales reales)",
+          "r.unit === \"scu\"" not in uex_js,
+          "ver .claude/guides/uex-api.md: ese filtro descarta anuncios reales de gemas de cueva/vehiculo")
 
     data_js = (ROOT / "js" / "data.js").read_text(encoding="utf-8")
     check("data.js: loadMarketplaceAverages definido", "loadMarketplaceAverages" in data_js)
     check("data.js: marketplaceAvgFor definido", "marketplaceAvgFor" in data_js)
     check("data.js: QUALITY_TIER_LABELS definido", "QUALITY_TIER_LABELS" in data_js)
+    check("data.js: marketplaceAvgFor devuelve `unit` por fila (contrato post-4.9)",
+          re.search(r"marketplaceAvgFor\(oreKey\)\s*\{[\s\S]{0,900}unit:\s*r\.unit", data_js) is not None)
+    check("data.js: marketplaceAvgFor ya no usa el nombre priceAvgScu (renombrado a priceAvg, sin alias)",
+          "priceAvgScu:" not in data_js)
+
+    # --- alias de nombre UEX (naming quirks verificados contra la API real,
+    # ver .claude/guides/uex-api.md): sin esto, uexFor devuelve el commodity
+    # REFINADO etiquetado como "en bruto" (Lindinium/Savrilium) o ninguno de
+    # los dos cruza (Ice/Saldynium/Carinite Pure). No aceptar una "correccion"
+    # que borre estas 5 claves sin volver a verificar contra la API en vivo.
+    check("data.js: UEX_NAME_OVERRIDES definido", "UEX_NAME_OVERRIDES" in data_js)
+    for ore_key in ("CARINITEPURE", "LINDINIUM", "SAVRILIUM", "ICE", "SALDYNIUM"):
+        check(f"data.js: UEX_NAME_OVERRIDES cubre {ore_key}",
+              re.search(rf"\b{ore_key}\s*:", data_js) is not None)
+    check("data.js: uexFor usa UEX_NAME_OVERRIDES",
+          re.search(r"uexFor\(oreKey\)\s*\{[\s\S]{0,200}UEX_NAME_OVERRIDES", data_js) is not None)
+    check("data.js: uexBaseName definido (normaliza sufijo bruto de 3 formas distintas)",
+          "function uexBaseName" in data_js)
+    check("data.js: uexRefinedFor usa uexBaseName",
+          re.search(r"uexRefinedFor\(oreKey\)\s*\{[\s\S]{0,300}uexBaseName", data_js) is not None)
+    check("data.js: marketplaceAvgFor usa uexBaseName",
+          re.search(r"marketplaceAvgFor\(oreKey\)\s*\{[\s\S]{0,300}uexBaseName", data_js) is not None)
+
+    # --- etiqueta de mineral segura ante claves UNKNOWN_<hash> de location_ores
+    # (nodos FPS que el propio Strata no ha podido identificar aun): el usuario
+    # nunca debe ver la clave hash cruda en pantalla. Ver .claude/guides/datos-juego.md.
+    check("data.js: oreLabel definido", "oreLabel(oreKey)" in data_js)
+    check("data.js: oreLabel nunca devuelve una clave UNKNOWN_ cruda",
+          re.search(r"oreLabel\(oreKey\)\s*\{[\s\S]{0,200}UNKNOWN_", data_js) is not None)
+
+    # location_ores puede traer relative_probability null (dato genuino, no
+    # ausencia por bug de lectura) para minerales confirmados sin porcentaje
+    # medido aun: se preserva tal cual, no se inventa un 0. La vista debe
+    # distinguir esto de un "-%" generico (contrato en datos-juego.md; el
+    # render en si es dominio web-ui, no de este gate).
+    if mdata is not None:
+        prob_values = [
+            e.get("relative_probability")
+            for loc in mdata.get("location_ores", {}).values()
+            for entries in (loc.get("ores") or {}).values()
+            for e in entries
+        ]
+        check("mining_data.json: location_ores trae relative_probability null en algun caso (esperado, no bug)",
+              any(p is None for p in prob_values), "si esto cambia en un parche, revisar si el contrato sigue aplicando")
 
     # --- refresco manual forzado (salta la cache de 30 min) -------------
     check("data.js: refreshLive definido", "refreshLive" in data_js)

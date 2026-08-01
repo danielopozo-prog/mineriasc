@@ -19,7 +19,7 @@ y si UEX renombró commodities (guía uex-api.md).
 | `meta` | Parche, fecha, contadores | header (app.js) |
 | `ores` | 39 minerales: `display_name`, `uex_name`, `mining_method`, `difficulty{instability, resistance, explosion_multiplier, cluster_factor…}` | Buscador, Inventario |
 | `locations` | 86 ubicaciones: `display_name`, `system`, `type`, `has_refinery` | detalle de ubicación |
-| `location_ores` | 48 zonas con `ores.{ship,fps,vehicle}[] = {ore, relative_probability}` | Ubicaciones + índice `oreToLocations` |
+| `location_ores` | 48 zonas con `ores.{ship,fps,vehicle}[] = {ore, relative_probability, panel_confirmed}` | Ubicaciones + índice `oreToLocations` |
 | `scanner_signals` | 76 señales: `signal_value`, `tier`, `ore_hint`, `mining_context` | pills del Buscador; también fuente de rareza (`DATA.oreRarity`, ver abajo) |
 | `refineries.stations` | Estación → `{system, capacity_scu, yields{ORE: {value…}}}` (bonos % de rendimiento) | tabla de Refinería; también fuente de `DATA.bestRefineryFor()` |
 
@@ -39,6 +39,40 @@ Claves presentes pero **no usadas aún**: `compositions`, `cave_compositions`,
   `refineries.stations` (más flexible y verificado contra ese mismo campo, ver
   `.claude/guides/uex-api.md`).
 - Los `yields` de refinería son enteros con signo (± %), no multiplicadores.
+- **`location_ores[*].ores.{método}[]` trae entradas que NO son datos limpios,
+  y no hay que "arreglarlas" en la carga — son así en el JSON que descarga
+  Strata, verificado línea a línea (parche 4.9):
+  - **Claves `ore: "UNKNOWN_<hash>"`** (7 hashes distintos, 129 de 457 filas
+    totales en el parche actual — 28 %, concentradas casi todas en el método
+    `fps`): son nodos de minado que **el propio Strata no ha podido
+    identificar todavía** — se ve la probabilidad relativa pero no qué
+    mineral es. TODAS estas filas traen `panel_confirmed: false` (0
+    excepciones comprobadas); a la inversa, ningún `ore` conocido tiene
+    `panel_confirmed: true` bajo una clave `UNKNOWN_`, así que el propio
+    campo confirma la interpretación. No existe ninguna otra clave del JSON
+    (`rock_types`, `cave_compositions`, `compositions`…) que traduzca el
+    hash a un nombre — no hay nada que resolver, solo que no mostrar en
+    crudo. **Contrato**: `DATA.oreLabel(oreKey)` devuelve `"Mineral sin
+    identificar"` para estas claves en vez de la clave hash; cualquier vista
+    que lea un `ore` de `location_ores` debe usar `DATA.oreLabel()`, no
+    `DATA.ores[key]?.display_name` directo (ese patrón deja pasar el hash
+    crudo si no hay entrada en `ores` — bug real visto en `locations.js`).
+  - **`relative_probability: null`** con `ore` SÍ conocido y
+    `panel_confirmed: true` (82 filas en el parche actual, ej. Dolivine/
+    Aphorite/Hadanite en Pyro IV a pie): el mineral está confirmado en esa
+    ubicación/método pero Strata aún no le ha medido % relativo. Es un hueco
+    real de la fuente, no un fallo de `DATA.buildIndexes()` — el valor se
+    preserva tal cual (`null`), nunca se sustituye por `0`. **Contrato**: la
+    vista debe distinguir esto de un simple "sin dato" genérico (ej. "Sin
+    medir" en vez de formatear `null` como `"—%"`, que se confunde con el
+    guion que ya usa `fmtNum` para cualquier ausencia) — cambio de
+    presentación, dominio `web-ui`.
+  - Además existen 9 filas con `ore` conocido y `panel_confirmed: false` pero
+    `relative_probability` sí numérico (ej. `IRON` en Pyro IV, método
+    `ship`): probabilidad estimada pero no confirmada visualmente. No forma
+    parte de los dos fallos de arriba; el campo está disponible por si una
+    vista futura quiere marcarlo (icono "no confirmado"), pero no hay
+    obligación de usarlo ahora.
 - **No existe un campo `rarity`/`rareza` en `ores`** (comprobado: no está, ni en
   `mining_data.json` ni en `commodities` de la API de UEX). La única fuente real de
   rareza es `scanner_signals[*].tier`, y solo es fiable para los valores

@@ -19,7 +19,7 @@ Comprobar que el marketplace ya esta listo y leer un precio medio:
 
     python .claude/scripts/browser_check.py ^
         --wait "DATA.marketplaceReady === true" ^
-        --eval "DATA.marketplaceAvgFor('COPPER').find(t => t.qualityTier === 5).priceAvgScu"
+        --eval "DATA.marketplaceAvgFor('COPPER').find(t => t.unit === 'scu' && t.qualityTier === 5).priceAvg"
 
 Abrir una pestana concreta y comprobar que no hay errores de consola relevantes
 (usando solo --eval, sin --wait):

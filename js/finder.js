@@ -10,6 +10,23 @@
      poco densas).
    - rarityDotHtml: solo un punto de color con title (listas y matriz,
      donde el texto no cabe o rompe la alineación). */
+/* Etiquetas en español de las unidades de venta del Marketplace P2P de UEX
+   (DATA.marketplaceAvgFor). Presentación pura, por eso vive aquí y no en
+   data.js — si aparece una unidad nueva no listada, se usa la clave cruda
+   como fallback (mejor que ocultar la fila). */
+const UNIT_ES = {
+  scu: "SCU",
+  unit: "unidad",
+  pack: "pack",
+  dozen: "docena",
+  box: "caja",
+  cscu: "cSCU",
+  set: "set",
+  stack: "pila",
+  crate: "cajón",
+  hundred: "centena",
+};
+
 function rarityDotHtml(oreKey) {
   const r = DATA.rarityFor(oreKey);
   if (!r) return "";
@@ -157,30 +174,58 @@ const Finder = {
       </div>
       ${uexRaw || uexRef ? `<div id="ore-terminals" class="loading">Cargando mejores terminales de venta…</div>` : ""}
 
-      ${
-        mkt.length
-          ? `<h4>Mercado de jugadores (UEX Marketplace)</h4>
-            <p class="hint" title="Media de anuncios entre jugadores en el Marketplace de UEX, por tramo de calidad. Dato orientativo, no es precio oficial de terminal.">
-              Anuncios entre jugadores, por tramo de calidad · orientativo, no oficial
-            </p>
-            <div class="table-wrap"><table>
-              <thead><tr><th>Calidad</th><th>Precio medio/SCU</th><th>Anuncios</th></tr></thead>
-              <tbody>${mkt
-                .map(
-                  (m) => `<tr class="${m.listingsCount < 3 ? "low-confidence" : ""}" title="${
-                    m.listingsCount < 3 ? "Pocos anuncios: dato poco fiable" : ""
-                  }">
-                    <td>${esc(m.qualityLabel)}</td>
-                    <td class="num">${fmtNum(m.priceAvgScu)} aUEC</td>
-                    <td class="num">${fmtNum(m.listingsCount)}</td>
-                  </tr>`
-                )
-                .join("")}</tbody></table></div>`
-          : ""
-      }
+      ${this.renderMarketplaceSection(mkt)}
     `;
 
     if (uexRaw || uexRef) this.loadTerminals(uexRaw, uexRef, oreKey);
+  },
+
+  // Mercado de jugadores (UEX Marketplace): DATA.marketplaceAvgFor ya no
+  // asume SCU — cada fila trae su `unit` real ("scu", "unit", "pack"...) y
+  // `priceAvg` es el precio de UNA unidad de venta, no de un SCU (ver
+  // comentario de contrato en data.js). Nunca hay que mezclar ambas
+  // magnitudes en la misma tabla sin etiquetar: se separan en dos bloques,
+  // uno "por SCU" (mayoría de minerales) y otro "por unidad de venta" para
+  // los que solo se trafican en packs/docenas/cajas (p.ej. Carinite).
+  renderMarketplaceSection(mkt) {
+    if (!mkt.length) return "";
+
+    const rowHtml = (m, unitLabel) => `
+      <tr class="${m.listingsCount < 3 ? "low-confidence" : ""}" title="${
+        m.listingsCount < 3 ? "Pocos anuncios: dato poco fiable" : ""
+      }">
+        <td>${esc(m.qualityLabel)}</td>
+        ${unitLabel !== null ? `<td>${esc(unitLabel)}</td>` : ""}
+        <td class="num">${fmtNum(m.priceAvg)} aUEC</td>
+        <td class="num">${fmtNum(m.listingsCount)}</td>
+      </tr>`;
+
+    const scuRows = mkt.filter((m) => m.unit === "scu");
+    const otherRows = mkt.filter((m) => m.unit !== "scu");
+
+    const scuBlock = scuRows.length
+      ? `<h5>Por SCU</h5>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Calidad</th><th>Precio medio/SCU</th><th>Anuncios</th></tr></thead>
+          <tbody>${scuRows.map((m) => rowHtml(m, null)).join("")}</tbody></table></div>`
+      : "";
+
+    const otherBlock = otherRows.length
+      ? `<h5>Por unidad de venta</h5>
+        <p class="hint">Se venden en packs/docenas/cajas, no a granel por SCU — el precio es por unidad de venta indicada.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Calidad</th><th>Unidad</th><th>Precio medio</th><th>Anuncios</th></tr></thead>
+          <tbody>${otherRows.map((m) => rowHtml(m, UNIT_ES[m.unit] || m.unit)).join("")}</tbody></table></div>`
+      : "";
+
+    return `
+      <h4>Mercado de jugadores (UEX Marketplace)</h4>
+      <p class="hint" title="Media de anuncios entre jugadores en el Marketplace de UEX, por tramo de calidad. Dato orientativo, no es precio oficial de terminal.">
+        Anuncios entre jugadores, por tramo de calidad · orientativo, no oficial
+      </p>
+      ${scuBlock}
+      ${otherBlock}
+    `;
   },
 
   // Mejores terminales donde vender, bajo demanda por mineral.
