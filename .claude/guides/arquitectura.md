@@ -139,3 +139,11 @@ para eso sigue haciendo falta abrir el navegador de verdad — pero cubre la
 comprobación reproducible de "esta expresión/dato es correcto en tiempo de
 ejecución", útil tanto para `web-ui` (ids, render, `DATA`/`UEX` ya cargados) como
 para `datos-uex` (forma de los datos, ausencia de errores de carga).
+
+**Trampa de Git Bash/MSYS con `--path`**: pasa la ruta sin barra inicial
+(`--path index.html`, no `--path /index.html`). MSYS reescribe argumentos que
+parecen paths absolutos Unix a paths de Windows antes de que Python los vea
+(`/index.html` → `file:///C:/Program Files/Git/index.html`), así que Chrome
+navega a un archivo inexistente y todo `--wait`/`--eval` falla con
+`chrome-error://chromewebdata/`. Alternativa: exportar `MSYS_NO_PATHCONV=1`
+para esa llamada si necesitas conservar la barra inicial.

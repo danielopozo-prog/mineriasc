@@ -24,7 +24,7 @@ Comprobar que el marketplace ya esta listo y leer un precio medio:
 Abrir una pestana concreta y comprobar que no hay errores de consola relevantes
 (usando solo --eval, sin --wait):
 
-    python .claude/scripts/browser_check.py --path /index.html \
+    python .claude/scripts/browser_check.py --path index.html \
         --eval "document.querySelectorAll('.side-item').length"
 
 Reutiliza un servidor ya levantado en el puerto (por ejemplo uno que dejaste
@@ -336,7 +336,17 @@ def main() -> int:
         "--port", type=int, default=8123, help="Puerto HTTP del sitio (por defecto 8123; se reutiliza si ya hay algo escuchando ahi)."
     )
     parser.add_argument(
-        "--path", default="/index.html", help="Ruta a abrir dentro del sitio (por defecto /index.html)."
+        "--path",
+        default="/index.html",
+        help=(
+            "Ruta a abrir dentro del sitio (por defecto /index.html). "
+            "Usar sin barra inicial (index.html, no /index.html): en Git "
+            "Bash/MSYS, un argumento que parece un path absoluto Unix se "
+            "reescribe a un path de Windows antes de llegar a Python (p.ej. "
+            "/index.html -> file:///C:/Program Files/Git/index.html), y "
+            "Chrome navega a un archivo inexistente en vez de al servidor "
+            "local."
+        ),
     )
     parser.add_argument(
         "--chrome", default=None, help="Ruta a chrome.exe/chromium; si se omite, se autodetecta (o usa CHROME_PATH)."

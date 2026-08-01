@@ -449,6 +449,73 @@ tr.low-confidence td { opacity: 0.55; }
   border-top: 1px solid var(--border-muted);
 }
 .inv-list .entry .meta { color: var(--text-dim); font-size: 0.75rem; }
+
+/* Vista "Por ubicación": parrilla de cajas-acordeón, una por ubicación */
+.inv-boxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.inv-box {
+  background: var(--bg-alt);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.inv-box-head {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  text-align: left;
+  color: var(--text);
+}
+.inv-box-head:hover { background: var(--panel-hover); }
+.inv-box-name {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  line-height: 1.1;
+}
+.inv-box-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.inv-box-meta .accent { color: var(--accent); font-weight: 600; }
+.inv-box-caret { color: var(--text-dim); }
+.inv-box-body { border-top: 1px solid var(--border-muted); }
+.inv-box-body[hidden] { display: none; }
+.inv-box-sub + .inv-box-sub { border-top: 1px solid var(--border-muted); }
+.inv-box-sub-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.02);
+}
+/* Nombre a la izquierda (puede partirse en varias palabras) y cantidad/valor
+   a la derecha sin partirse él mismo: si no caben en la misma línea, el
+   conjunto de la derecha baja entero a la línea siguiente (flex-wrap + gap
+   arriba) en vez de pegarse al nombre o partirse a mitad de cifra. */
+.inv-box-sub-head > span:first-child { min-width: 0; overflow-wrap: break-word; }
+.inv-box-sub-head > span:last-child { white-space: nowrap; }
+.inv-box-sub .entry { padding-left: 20px; }
+
 .entry-del {
   background: none;
   border: none;

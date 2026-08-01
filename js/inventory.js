@@ -33,6 +33,10 @@ const Inventory = {
   STORAGE_KEY: "mineriasc_inventory",
   groupBy: "ore",
   entries: [],
+  // Cajas de ubicación abiertas en la vista "Por ubicación". Estado efímero
+  // (no se persiste): se resetea al recargar la página, se conserva mientras
+  // se navega/edita el inventario en la misma sesión.
+  openLocs: new Set(),
 
   init() {
     try {
@@ -187,6 +191,18 @@ const Inventory = {
     this.render();
   },
 
+  // Clave de agrupación por ubicación: cadena vacía = "sin ubicación" (así
+  // coincide con `entry.loc`, que también es "" cuando no se eligió ninguna).
+  locKey(entry) {
+    return entry.loc || "";
+  },
+
+  toggleLocBox(key) {
+    if (this.openLocs.has(key)) this.openLocs.delete(key);
+    else this.openLocs.add(key);
+    this.render();
+  },
+
   // Solo los minerales concretos tienen precio UEX: las entradas genéricas
   // devuelven null a propósito, nunca un valor inventado.
   valueOf(entry) {
@@ -220,19 +236,26 @@ const Inventory = {
       <div class="stat"><div class="label">Valor estimado (venta UEX)</div><div class="value accent">${fmtNum(totalValue)} aUEC</div></div>
       ${genericOtherEntries.length ? `<div class="stat"><div class="label">Otros objetos (sin valorar)</div><div class="value">${fmtNum(totalGenericUds, 2)} ud</div></div>` : ""}`;
 
-    // agrupar
+    list.innerHTML = this.groupBy === "loc" ? this.renderLocationBoxes() : this.renderMineralGroups();
+
+    list.querySelectorAll(".entry-del").forEach((b) =>
+      b.addEventListener("click", () => this.remove(Number(b.dataset.id)))
+    );
+    list.querySelectorAll(".inv-box-head").forEach((h) =>
+      h.addEventListener("click", () => this.toggleLocBox(h.dataset.key))
+    );
+  },
+
+  // Vista "Por mineral": una lista de grupos por mineral/categoría; cada
+  // línea muestra en qué ubicación se registró (formato original, intacto).
+  renderMineralGroups() {
     const groups = {};
     for (const e of this.entries) {
-      let key;
-      if (this.groupBy === "ore") {
-        key = this.isGeneric(e) ? `${CATEGORY_ES[e.category] || e.category} (genérico)` : this.labelOf(e);
-      } else {
-        key = e.loc || "Sin ubicación";
-      }
+      const key = this.isGeneric(e) ? `${CATEGORY_ES[e.category] || e.category} (genérico)` : this.labelOf(e);
       (groups[key] ??= []).push(e);
     }
 
-    list.innerHTML = Object.entries(groups)
+    return Object.entries(groups)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([name, items]) => {
         const scu = items.filter((e) => this.unitOf(e) === "SCU").reduce((s, e) => s + e.qty, 0);
@@ -240,11 +263,10 @@ const Inventory = {
         const hasValuable = items.some((e) => !this.isGeneric(e));
         const rows = items
           .map((e) => {
-            const other = this.groupBy === "ore" ? esc(e.loc || "Sin ubicación") : esc(this.labelOf(e));
             const note = this.isGeneric(e) && e.note ? ` <span class="meta">· ${esc(e.note)}</span>` : "";
             return `<div class="entry">
               <span>
-                ${other}${note}
+                ${esc(e.loc || "Sin ubicación")}${note}
                 <span class="meta"> · ${new Date(e.date).toLocaleDateString("es-ES")}</span>
               </span>
               <span>
@@ -262,10 +284,92 @@ const Inventory = {
           </div>${rows}</div>`;
       })
       .join("");
+  },
 
-    list.querySelectorAll(".entry-del").forEach((b) =>
-      b.addEventListener("click", () => this.remove(Number(b.dataset.id)))
-    );
+  // Vista "Por ubicación": una caja por ubicación con objetos (más una caja
+  // "Sin ubicación" al final si aplica). El nombre de la ubicación queda en
+  // grande en la cabecera; al pinchar se abre/cierra la caja (acordeón). Las
+  // líneas dentro de cada caja se subagrupan por mineral/categoría —fusión
+  // solo visual, sumando cantidad y valor— pero cada entrada original se
+  // sigue listando por separado con su propia fecha y botón de borrado, así
+  // no se pierde el historial ni la granularidad para eliminar un registro
+  // concreto.
+  renderLocationBoxes() {
+    const boxes = {};
+    for (const e of this.entries) {
+      (boxes[this.locKey(e)] ??= []).push(e);
+    }
+    const NONE_KEY = "";
+    const orderedKeys = Object.keys(boxes)
+      .filter((k) => k !== NONE_KEY)
+      .sort((a, b) => a.localeCompare(b));
+    if (boxes[NONE_KEY]) orderedKeys.push(NONE_KEY);
+
+    const boxesHtml = orderedKeys
+      .map((key) => {
+        const items = boxes[key];
+        const name = key || "Sin ubicación";
+        const scuItems = items.filter((e) => this.unitOf(e) === "SCU");
+        const otherUdItems = items.filter((e) => this.unitOf(e) !== "SCU");
+        const scu = scuItems.reduce((s, e) => s + e.qty, 0);
+        const otherUd = otherUdItems.reduce((s, e) => s + e.qty, 0);
+        const val = items.reduce((s, e) => s + (this.valueOf(e) || 0), 0);
+        const hasValuable = items.some((e) => !this.isGeneric(e));
+        const open = this.openLocs.has(key);
+
+        const subgroups = {};
+        for (const e of items) {
+          const label = this.isGeneric(e) ? `${CATEGORY_ES[e.category] || e.category} (genérico)` : this.labelOf(e);
+          (subgroups[label] ??= []).push(e);
+        }
+        const subHtml = Object.entries(subgroups)
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([label, subItems]) => {
+            const subQty = subItems.reduce((s, e) => s + e.qty, 0);
+            const subVal = subItems.reduce((s, e) => s + (this.valueOf(e) || 0), 0);
+            const subValuable = subItems.some((e) => !this.isGeneric(e));
+            const unit = this.unitOf(subItems[0]);
+            const rows = subItems
+              .map((e) => {
+                const note = this.isGeneric(e) && e.note ? ` <span class="meta">· ${esc(e.note)}</span>` : "";
+                return `<div class="entry">
+                  <span>
+                    ${fmtNum(e.qty, 2)} ${esc(this.unitOf(e))}${note}
+                    <span class="meta"> · ${new Date(e.date).toLocaleDateString("es-ES")}</span>
+                  </span>
+                  <span>
+                    <button class="entry-del" data-id="${e.id}" title="Eliminar registro">✕</button>
+                  </span>
+                </div>`;
+              })
+              .join("");
+            return `<div class="inv-box-sub">
+              <div class="inv-box-sub-head">
+                <span>${esc(label)}</span>
+                <span>${fmtNum(subQty, 2)} ${esc(unit)}${subValuable ? " · " + fmtNum(subVal) + " aUEC" : ""}</span>
+              </div>
+              ${rows}
+            </div>`;
+          })
+          .join("");
+
+        return `<div class="inv-box">
+          <button type="button" class="inv-box-head" data-key="${esc(key)}" aria-expanded="${open}">
+            <span class="inv-box-name">${esc(name)}</span>
+            <span class="inv-box-meta">
+              <span>${items.length} obj.</span>
+              ${scuItems.length ? `<span>${fmtNum(scu, 2)} SCU</span>` : ""}
+              ${otherUdItems.length ? `<span>${fmtNum(otherUd, 2)} ud</span>` : ""}
+              <span class="accent">${hasValuable ? fmtNum(val) + " aUEC" : "sin valorar"}</span>
+              <span class="inv-box-caret">${open ? "▾" : "▸"}</span>
+            </span>
+          </button>
+          <div class="inv-box-body"${open ? "" : " hidden"}>${subHtml}</div>
+        </div>`;
+      })
+      .join("");
+
+    return `<div class="inv-boxes">${boxesHtml}</div>`;
   },
 
   exportJson() {
