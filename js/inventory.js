@@ -31,7 +31,12 @@ const CATEGORY_UNIT = {
 
 const Inventory = {
   STORAGE_KEY: "mineriasc_inventory",
-  groupBy: "ore",
+  // Vista por defecto al entrar en la pestaña: "por ubicación" (las cajas).
+  // El conmutador de arriba (Por mineral / Por ubicación) sigue funcionando
+  // igual; esto solo fija el estado inicial. init() sincroniza las clases
+  // "active" de los botones con este valor vía setGroup(), así que cambiar
+  // esto es lo único que hace falta para cambiar la vista de entrada.
+  groupBy: "loc",
   entries: [],
   // Cajas de ubicación abiertas en la vista "Por ubicación". Estado efímero
   // (no se persiste): se resetea al recargar la página, se conserva mientras
@@ -96,7 +101,11 @@ const Inventory = {
     document.getElementById("inv-export-discord").addEventListener("click", () => this.exportDiscord());
     document.getElementById("inv-clear").addEventListener("click", () => this.clear());
 
-    this.render();
+    // setGroup() (no render() a secas) para que las clases "active" de los
+    // botones Por mineral/Por ubicación queden sincronizadas con groupBy
+    // desde el primer render, sin depender de qué clase venga hardcodeada
+    // en el HTML.
+    this.setGroup(this.groupBy);
   },
 
   // Alterna el formulario entre "mineral concreto" (flujo original) y

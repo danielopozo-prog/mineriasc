@@ -16,7 +16,18 @@
      el más cercano). Un clic en un resultado también alterna su
      selección.
    - Favoritos de mineral, persistidos en localStorage, que se muestran
-     agrupados arriba de la lista y se priorizan en la búsqueda inversa. */
+     agrupados arriba de la lista y se priorizan en la búsqueda inversa.
+   - Modo "por ubicación": el jugador elige una ubicación de minado (zonas
+     de mining_data.json, vía DATA.locationOres — NO el catálogo ampliado
+     de estaciones/ciudades de UEX, que no tiene minerales asociados) y ve
+     TODAS las señales posibles (base × ×1..15) de los minerales presentes
+     ahí, como chips ordenados de mayor a menor valor en una cuadrícula de
+     10 columnas en escritorio — para localizar de un vistazo en qué rango
+     cae la lectura del escáner y qué mineral es. Convive con el modo por
+     mineral: mientras está activo se oculta el `.split` (lista+ficha) y se
+     muestra `#sig-loc-guide` en su lugar; "Volver a minerales" restaura el
+     `.split` sin tocar selección/favoritos/búsqueda inversa, que viven en
+     el mismo estado de siempre. */
 
 const SIGNAL_CONTEXT_ES = {
   asteroid: "Asteroide",
@@ -28,9 +39,24 @@ const SIGNAL_CONTEXT_ES = {
 const SIGNAL_MULTIPLIERS = 15;
 const FAVORITES_KEY = "mineriasc_favorites";
 
+// Paleta de color por mineral en el modo "por ubicación" (máx. 10 minerales
+// vistos en una misma ubicación de mining_data.json a día de hoy — si algún
+// día hay más, el color se recicla por módulo, no rompe nada, solo dos
+// minerales comparten tono). Deliberadamente NO incluye --accent (rojo):
+// ese color queda reservado para resaltar coincidencias con la búsqueda
+// inversa, para que un chip "acertado" no se confunda con el color de un
+// mineral cualquiera.
+const SIG_LOC_PALETTE = [
+  "#ff6a3d", "#4da3ff", "#4cd97b", "#e0c341", "#b06cf5",
+  "#4dd9d9", "#ff5c9e", "#9fd94c", "#ffb04d", "#7a8cff",
+];
+
 const Signals = {
   selected: new Set(),
   favorites: [],
+  // locKey de la ubicación activa en el modo "por ubicación", o null si el
+  // modo no está activo (vista normal por mineral).
+  activeLocKey: null,
 
   init() {
     this.favorites = this.loadFavorites();
@@ -45,10 +71,157 @@ const Signals = {
       this.clearSelection();
     });
 
+    this.initLocMode();
+
     this.renderList("");
     this.renderReverse("");
     this.renderDetail();
     this.updateClearButton();
+  },
+
+  /* ---------- Modo "por ubicación" ---------- */
+
+  // Ubicaciones de minado (mining_data.json vía DATA.locationOres), NO el
+  // catálogo ampliado de UEX (DATA.allLocations()/DATA.uexLocations): ese
+  // catálogo tiene ciudades/estaciones sin minerales asociados, inútil aquí.
+  miningLocations() {
+    return Object.entries(DATA.locationOres)
+      .map(([locKey, loc]) => ({ locKey, name: loc.name, system: loc.system }))
+      .sort((a, b) => (a.system || "").localeCompare(b.system || "") || a.name.localeCompare(b.name));
+  },
+
+  initLocMode() {
+    const sel = document.getElementById("sig-loc-select");
+    const bySystem = {};
+    for (const l of this.miningLocations()) {
+      (bySystem[l.system || "Otro"] ??= []).push(l);
+    }
+    sel.innerHTML =
+      '<option value="">Elige una ubicación de minado…</option>' +
+      Object.entries(bySystem)
+        .map(
+          ([system, locs]) =>
+            `<optgroup label="${esc(system)}">${locs
+              .map((l) => `<option value="${esc(l.locKey)}">${esc(l.name)}</option>`)
+              .join("")}</optgroup>`
+        )
+        .join("");
+
+    sel.addEventListener("change", () => this.selectLocation(sel.value));
+    document.getElementById("sig-loc-back").addEventListener("click", () => this.clearLocation());
+  },
+
+  // Minerales presentes en una ubicación (todos los métodos de minado
+  // fusionados, sin duplicados), limitados a los que tienen ficha en
+  // DATA.ores (descarta los UNKNOWN_* sin identificar todavía) y al menos
+  // una señal de escáner conocida (si no, no hay nada que mostrar de él).
+  oresAtLocation(locKey) {
+    const loc = DATA.locationOres[locKey];
+    if (!loc) return [];
+    const keys = new Set();
+    for (const list of Object.values(loc.ores || {})) {
+      for (const e of list) keys.add(e.ore);
+    }
+    return [...keys]
+      .filter((k) => DATA.ores[k] && (DATA.oreToSignals[k] || []).length)
+      .map((k) => ({ key: k, ore: DATA.ores[k] }))
+      .sort((a, b) => a.ore.display_name.localeCompare(b.ore.display_name));
+  },
+
+  // Todos los valores posibles de señal en una ubicación: cada mineral
+  // presente aporta, por cada valor base distinto que tenga (groupSignals
+  // ya deduplica asteroide/superficie que comparten cifra), sus 15
+  // múltiplos. Dos minerales pueden coincidir en un mismo valor exacto: se
+  // devuelven ambos chips por separado, nunca se fusionan.
+  locGuideChips(locKey) {
+    const ores = this.oresAtLocation(locKey);
+    const colorByOre = {};
+    ores.forEach((o, idx) => (colorByOre[o.key] = SIG_LOC_PALETTE[idx % SIG_LOC_PALETTE.length]));
+
+    const chips = [];
+    for (const { key, ore } of ores) {
+      const groups = this.groupSignals(DATA.oreToSignals[key] || []);
+      for (const g of groups) {
+        for (let m = 1; m <= SIGNAL_MULTIPLIERS; m++) {
+          chips.push({ oreKey: key, oreName: ore.display_name, value: g.value * m, mult: m });
+        }
+      }
+    }
+    // Orden descendente estricto por valor; empate (dos minerales con el
+    // mismo valor) se rompe por nombre y luego múltiplo, solo para que el
+    // orden sea determinista, no afecta a qué se muestra.
+    chips.sort((a, b) => b.value - a.value || a.oreName.localeCompare(b.oreName) || a.mult - b.mult);
+    return { ores, colorByOre, chips };
+  },
+
+  selectLocation(locKey) {
+    this.activeLocKey = locKey || null;
+    document.getElementById("sig-split").hidden = !!this.activeLocKey;
+    document.getElementById("sig-loc-back").hidden = !this.activeLocKey;
+    this.renderLocGuide();
+  },
+
+  clearLocation() {
+    document.getElementById("sig-loc-select").value = "";
+    this.selectLocation(null);
+  },
+
+  renderLocGuide() {
+    const el = document.getElementById("sig-loc-guide");
+    if (!this.activeLocKey) {
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+    el.hidden = false;
+
+    const loc = DATA.locationOres[this.activeLocKey];
+    const locName = loc?.name || "esta ubicación";
+    const { ores, colorByOre, chips } = this.locGuideChips(this.activeLocKey);
+
+    if (!ores.length) {
+      el.innerHTML = `<p class="placeholder">${esc(locName)} no tiene minerales con señal de escáner registrada.</p>`;
+      return;
+    }
+
+    const target = this.parseReverseInput(document.getElementById("sig-reverse-input").value);
+
+    const legendHtml = ores
+      .map(
+        (o) => `<div class="sig-loc-legend-item">
+          <span class="sig-loc-swatch" style="--chip-c:${colorByOre[o.key]}"></span>
+          <span>${esc(o.ore.display_name)}</span>
+          ${this.favStarHtml(o.key)}
+        </div>`
+      )
+      .join("");
+
+    const chipsHtml = chips
+      .map((c) => {
+        const match = target != null && c.value === target;
+        const sel = this.selected.has(c.oreKey);
+        return `<div class="sig-loc-chip ${match ? "match" : ""} ${sel ? "selected" : ""}" style="--chip-c:${colorByOre[c.oreKey]}" data-ore="${esc(c.oreKey)}" title="${esc(c.oreName)} · ×${c.mult}">
+          <span class="sig-loc-chip-value">${fmtNum(c.value)}</span>
+          <span class="sig-loc-chip-ore">${esc(c.oreName)}</span>
+        </div>`;
+      })
+      .join("");
+
+    el.innerHTML = `
+      <div class="sig-loc-guide-head">
+        <h3>${esc(locName)}</h3>
+        <span class="hint">${ores.length} mineral${ores.length === 1 ? "" : "es"} · ${chips.length} valores posibles, de mayor a menor</span>
+      </div>
+      <div class="sig-loc-legend">${legendHtml}</div>
+      <div class="sig-loc-chip-grid">${chipsHtml}</div>`;
+
+    this.attachFavStarListeners(el);
+    el.querySelectorAll(".sig-loc-chip").forEach((c) =>
+      c.addEventListener("click", () => {
+        this.toggleSelect(c.dataset.ore);
+        this.renderLocGuide();
+      })
+    );
   },
 
   /* ---------- Favoritos (localStorage) ---------- */
@@ -81,6 +254,7 @@ const Signals = {
     this.renderList(document.getElementById("sig-search").value.trim().toLowerCase());
     this.renderReverse(document.getElementById("sig-reverse-input").value);
     this.renderDetail();
+    this.renderLocGuide();
   },
 
   favStarHtml(oreKey, extraClass = "") {
@@ -325,6 +499,7 @@ const Signals = {
 
     if (target == null) {
       container.innerHTML = "";
+      this.renderLocGuide();
       return;
     }
 
@@ -384,5 +559,6 @@ const Signals = {
       el.addEventListener("click", () => this.toggleSelect(el.dataset.ore))
     );
     this.attachFavStarListeners(container);
+    this.renderLocGuide();
   },
 };

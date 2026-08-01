@@ -131,7 +131,15 @@
         <input type="text" inputmode="numeric" id="sig-reverse-input" placeholder="p. ej. 23040" autocomplete="off">
         <div id="sig-reverse-results" class="sig-reverse-results"></div>
       </div>
-      <div class="split">
+      <div class="sig-loc-mode">
+        <label for="sig-loc-select" class="sig-reverse-label">O consulta todas las señales de una ubicación de minado</label>
+        <div class="sig-loc-mode-row">
+          <select id="sig-loc-select"></select>
+          <button type="button" id="sig-loc-back" class="btn small" hidden>← Volver a minerales</button>
+        </div>
+      </div>
+      <div id="sig-loc-guide" class="sig-loc-guide" hidden></div>
+      <div class="split" id="sig-split">
         <aside id="sig-list" class="side-list"></aside>
         <div id="sig-detail" class="detail">
           <p class="placeholder">Selecciona uno o varios minerales con señales de escáner.</p>

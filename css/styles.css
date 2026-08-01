@@ -752,3 +752,120 @@ footer a { color: var(--info); text-decoration: none; }
   .sig-hit-value { font-size: 2.6rem; }
   .sig-hit-ore { font-size: 1.5rem; }
 }
+
+/* ---------- Señales de escáner: modo "por ubicación" ---------- */
+.sig-loc-mode {
+  background: var(--bg-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.sig-loc-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.sig-loc-mode-row select { min-width: 260px; }
+
+.sig-loc-guide {
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.sig-loc-guide-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.sig-loc-guide-head h3 {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.sig-loc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-muted);
+}
+.sig-loc-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+.sig-loc-swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  background: var(--chip-c, var(--accent-2));
+  flex-shrink: 0;
+}
+
+/* Cuadrícula de chips: de 2 columnas en móvil a 10 fijas en escritorio, para
+   leer de un vistazo en qué rango cae la lectura del escáner. */
+.sig-loc-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+@media (min-width: 480px) {
+  .sig-loc-chip-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 700px) {
+  .sig-loc-chip-grid { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 5px; }
+}
+
+.sig-loc-chip {
+  background: var(--bg-alt);
+  border: 1px solid var(--border-muted);
+  border-left: 3px solid var(--chip-c, var(--accent-2));
+  border-radius: var(--radius-sm);
+  padding: 6px 5px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.sig-loc-chip:hover { background: var(--panel-hover); }
+.sig-loc-chip.selected { background: var(--accent-soft); }
+.sig-loc-chip.match {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.sig-loc-chip-value {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.sig-loc-chip-ore {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (min-width: 1100px) {
+  .sig-loc-chip-value { font-size: 1.2rem; }
+}
