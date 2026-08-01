@@ -12,7 +12,8 @@ js/finder.js     → objeto Finder (pestaña Buscador)
 js/locations.js  → objeto Locations (pestaña Ubicaciones)
 js/refinery.js   → objeto Refinery (pestaña Refinería, render perezoso)
 js/inventory.js  → objeto Inventory (pestaña Inventario)
-js/signals.js    → objeto Signals (pestaña Señales, múltiplos de escáner)
+js/signals.js    → objeto Signals (pestaña Señales, múltiplos de escáner,
+                   búsqueda inversa y favoritos de mineral)
 js/app.js        → arranque: DATA.load() → init de vistas → DATA.loadUexPrices()
 ```
 
@@ -45,7 +46,24 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
   borde rojo) como detalle decorativo sutil.
 - Cada vista es un objeto literal con `init()` / `render*()`; estado en propiedades
   (`selected`, `groupBy`…). Sin clases, sin módulos ES.
-- Claves de `localStorage`: `mineriasc_inventory` (inventario) y `mineriasc_uex_*`
-  (caché de la API con timestamp).
+- Claves de `localStorage`: `mineriasc_inventory` (inventario), `mineriasc_uex_*`
+  (caché de la API con timestamp) y `mineriasc_favorites` (array de claves de
+  mineral marcadas como favoritas en la pestaña Señales).
 - Los listados laterales (`.side-item`) se regeneran enteros en cada render y
   re-atachan sus listeners; no hay delegación de eventos.
+- Pestaña Señales (`js/signals.js`): además de la tabla de múltiplos por
+  mineral (ahora ×1…×15, tarjetas más grandes en escritorio ancho ≥1100px
+  vía media query en `css/styles.css`), tiene dos añadidos:
+  - **Búsqueda inversa** (`#sig-reverse-input` → `Signals.renderReverse`):
+    el jugador teclea la cifra que le muestra el escáner (acepta puntos de
+    miles, se limpia con un regex a solo dígitos) y la vista calcula, para
+    cada valor base de señal, el múltiplo (1..15) más cercano
+    (`Signals.bestCandidatesPerGroup` — un candidato por mineral/valor, no
+    los 15 múltiplos sueltos, para que un favorito no acapare el top con
+    tiros lejanos). Si hay coincidencia exacta (`diff === 0`) se listan
+    todas; si no, las 5 más cercanas por desviación absoluta.
+  - **Favoritos** (estrella `.fav-star` en cada `.side-item` y en la
+    cabecera del detalle, con `stopPropagation` para no disparar la
+    selección): persisten en `mineriasc_favorites`, se listan agrupados
+    bajo "Favoritos" arriba de la lista lateral, y se priorizan (antes que
+    la cercanía) al ordenar los resultados de la búsqueda inversa.
