@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minería SC — Panel de minería para Star Citizen</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⛏️</text></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-icon">⛏️</span>
+      <div>
+        <h1>Minería SC</h1>
+        <span class="brand-sub" id="meta-info">Cargando datos…</span>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="buscador">Buscador</button>
+      <button class="tab" data-tab="ubicaciones">Ubicaciones</button>
+      <button class="tab" data-tab="refineria">Refinería</button>
+      <button class="tab" data-tab="inventario">Inventario</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ============ BUSCADOR DE MINERALES ============ -->
+    <section id="tab-buscador" class="tab-panel active">
+      <div class="panel-head">
+        <h2>Buscador de minerales</h2>
+        <input type="search" id="ore-search" placeholder="Busca un mineral… (ej. Quantanium)" autocomplete="off">
+      </div>
+      <div class="split">
+        <aside id="ore-list" class="side-list"></aside>
+        <div id="ore-detail" class="detail">
+          <p class="placeholder">Selecciona un mineral para ver sus propiedades, precios en vivo y dónde encontrarlo.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ EXPLORADOR DE UBICACIONES ============ -->
+    <section id="tab-ubicaciones" class="tab-panel">
+      <div class="panel-head">
+        <h2>Explorador de ubicaciones</h2>
+        <div class="filter-row" id="system-filter"></div>
+      </div>
+      <div class="split">
+        <aside id="loc-list" class="side-list"></aside>
+        <div id="loc-detail" class="detail">
+          <p class="placeholder">Selecciona una ubicación para ver qué minerales hay y con qué probabilidad.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ REFINERÍA ============ -->
+    <section id="tab-refineria" class="tab-panel">
+      <div class="panel-head">
+        <h2>Refinería</h2>
+        <span class="hint">Bonos de rendimiento por estación (datos de UEX Corp). Verde = rinde más, rojo = rinde menos.</span>
+      </div>
+      <div id="refinery-methods" class="cards-row"></div>
+      <div class="table-wrap">
+        <table id="refinery-table"></table>
+      </div>
+    </section>
+
+    <!-- ============ INVENTARIO ============ -->
+    <section id="tab-inventario" class="tab-panel">
+      <div class="panel-head">
+        <h2>Inventario personal</h2>
+        <div class="btn-row">
+          <button id="inv-group-ore" class="btn small active">Por mineral</button>
+          <button id="inv-group-loc" class="btn small">Por ubicación</button>
+          <button id="inv-export-json" class="btn small">Exportar JSON</button>
+          <button id="inv-export-discord" class="btn small">Copiar para Discord</button>
+          <button id="inv-clear" class="btn small danger">Vaciar</button>
+        </div>
+      </div>
+      <form id="inv-form" class="inv-form">
+        <select id="inv-ore" required></select>
+        <input type="number" id="inv-qty" min="0" step="0.01" placeholder="Cantidad (SCU)" required>
+        <select id="inv-loc"></select>
+        <button type="submit" class="btn">Añadir</button>
+      </form>
+      <div id="inv-summary" class="inv-summary"></div>
+      <div id="inv-list" class="inv-list"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Datos de juego basados en <a href="https://seeknd.github.io/Strata/" target="_blank" rel="noopener">Strata</a> · Precios en vivo de <a href="https://uexcorp.space" target="_blank" rel="noopener">UEX Corp</a> · Proyecto personal, no afiliado a Cloud Imperium Games.</p>
+  </footer>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="js/uex.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/finder.js"></script>
+  <script src="js/locations.js"></script>
+  <script src="js/refinery.js"></script>
+  <script src="js/inventory.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
