@@ -684,39 +684,44 @@ footer a { color: var(--info); text-decoration: none; }
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--accent-2);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .sig-mineral-section-multi {
   background: var(--panel);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 18px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
 }
 .sig-mineral-section-multi:last-child { margin-bottom: 0; }
 .detail-head-row .sig-remove-btn { margin-left: auto; }
+/* Con varios minerales apilados el subtítulo no necesita tanto aire como en
+   la ficha de un único mineral (.detail .subtitle de referencia): varias
+   secciones seguidas deben caber con poco scroll. */
+.sig-mineral-section .subtitle { margin-bottom: 6px; }
 
 /* ---------- Señales de escáner (vista glanceable de múltiplos) ---------- */
 .signal-block {
   background: var(--panel);
   border: 1px solid var(--border-muted);
   border-radius: var(--radius);
-  padding: 14px;
-  margin-bottom: 16px;
+  padding: 8px;
+  margin-bottom: 8px;
 }
+.signal-block:last-child { margin-bottom: 0; }
 .signal-block-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 .signal-base { font-family: var(--font-ui); font-size: 0.85rem; color: var(--text-dim); margin-left: auto; }
 .signal-base b { color: var(--text); font-size: 1rem; }
 
 .mult-grid {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 /* ×1..5: el grupo protagonista, tarjetas grandes en fila/bloque superior. */
 .mult-grid-main {
@@ -725,17 +730,17 @@ footer a { color: var(--info); text-decoration: none; }
 /* ×6..15: mismo dato, tarjetas compactas debajo — jerarquía de un vistazo. */
 .mult-grid-rest {
   grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
-  gap: 6px;
+  gap: 5px;
 }
 .mult-card {
   background: var(--bg-alt);
   border: 1px solid var(--border-muted);
   border-radius: var(--radius-sm);
-  padding: 8px 6px;
+  padding: 6px;
   text-align: center;
 }
 .mult-grid-rest .mult-card {
-  padding: 5px 4px;
+  padding: 4px;
 }
 .mult-label {
   font-family: var(--font-ui);
@@ -764,7 +769,7 @@ footer a { color: var(--info); text-decoration: none; }
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 10px 0 6px;
+  margin: 5px 0 4px;
   font-family: var(--font-ui);
   font-size: 0.7rem;
   font-weight: 600;
@@ -783,15 +788,18 @@ footer a { color: var(--info); text-decoration: none; }
   .mult-value { font-size: 2.4rem; }
   /* ×6..15 en escritorio: 10 columnas fijas para que quepan siempre en una sola fila. */
   .mult-grid-rest { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
-  .mult-grid-rest .mult-card { padding: 4px 3px; }
+  .mult-grid-rest .mult-card { padding: 3px; }
   .mult-grid-rest .mult-value { font-size: 1.05rem; }
 }
 @media (min-width: 1100px) {
-  .mult-grid-main { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-  .mult-grid-rest { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 8px; }
-  .mult-grid-main .mult-card { padding: 14px 10px; }
-  .mult-grid-main .mult-label { font-size: 0.85rem; }
-  .mult-grid-rest .mult-card { padding: 6px 4px; }
+  /* Tarjetas ×1-5: gap y padding reducidos frente a versiones anteriores —
+     la cifra (.mult-value) no encoge, solo el aire alrededor, para que 2-3
+     minerales seleccionados quepan con poco scroll. */
+  .mult-grid-main { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .mult-grid-rest { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px; }
+  .mult-grid-main .mult-card { padding: 4px 8px; }
+  .mult-grid-main .mult-label { font-size: 0.7rem; }
+  .mult-grid-rest .mult-card { padding: 4px; }
   .mult-value { font-size: 3.2rem; }
   .mult-grid-rest .mult-value { font-size: 1.3rem; }
   .mult-grid-rest .mult-label { font-size: 0.7rem; }
@@ -836,14 +844,6 @@ footer a { color: var(--info); text-decoration: none; }
   font-weight: 600;
   text-transform: uppercase;
   color: var(--accent);
-}
-
-.sig-loc-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  background: var(--chip-c, var(--accent-2));
-  flex-shrink: 0;
 }
 
 /* Matriz de señales por ubicación: una fila por valor base de mineral,
@@ -899,13 +899,21 @@ footer a { color: var(--info); text-decoration: none; }
   font-family: var(--font-ui);
   font-weight: 600;
   color: var(--text);
-  border-left: 3px solid var(--chip-c, var(--accent-2));
   white-space: nowrap;
 }
 .sig-loc-mineral-inner {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+/* Nombre del mineral: la celda sticky de la izquierda, lo primero que se lee
+   de un vistazo — tamaño propio, mayor que el resto de la matriz (que va en
+   --font-num, condensado para cifras). Ya no lleva swatch de color por
+   mineral (quitado: convivía mal con el punto de rareza); ese punto es el
+   único indicador de color que queda en la celda. */
+.sig-loc-mineral-name {
+  font-size: 1.15rem;
+  font-weight: 700;
 }
 .sig-loc-mineral-h,
 .sig-loc-mineral-cell {

@@ -42,18 +42,6 @@ const SIGNAL_CONTEXT_ES = {
 const SIGNAL_MULTIPLIERS = 15;
 const FAVORITES_KEY = "mineriasc_favorites";
 
-// Paleta de color por mineral en el modo "por ubicación" (máx. 10 minerales
-// vistos en una misma ubicación de mining_data.json a día de hoy — si algún
-// día hay más, el color se recicla por módulo, no rompe nada, solo dos
-// minerales comparten tono). Deliberadamente NO incluye --accent (rojo):
-// ese color queda reservado para resaltar coincidencias con la búsqueda
-// inversa, para que un chip "acertado" no se confunda con el color de un
-// mineral cualquiera.
-const SIG_LOC_PALETTE = [
-  "#ff6a3d", "#4da3ff", "#4cd97b", "#e0c341", "#b06cf5",
-  "#4dd9d9", "#ff5c9e", "#9fd94c", "#ffb04d", "#7a8cff",
-];
-
 const Signals = {
   selected: new Set(),
   favorites: [],
@@ -140,8 +128,6 @@ const Signals = {
   // descendente (empate: nombre, para que el orden sea determinista).
   locGuideRows(locKey) {
     const ores = this.oresAtLocation(locKey);
-    const colorByOre = {};
-    ores.forEach((o, idx) => (colorByOre[o.key] = SIG_LOC_PALETTE[idx % SIG_LOC_PALETTE.length]));
 
     const rows = [];
     for (const { key, ore } of ores) {
@@ -166,7 +152,7 @@ const Signals = {
       }
     }
     rows.sort((a, b) => b.base - a.base || a.oreName.localeCompare(b.oreName));
-    return { ores, colorByOre, rows };
+    return { ores, rows };
   },
 
   selectLocation(locKey) {
@@ -192,7 +178,7 @@ const Signals = {
 
     const loc = DATA.locationOres[this.activeLocKey];
     const locName = loc?.name || "esta ubicación";
-    const { ores, colorByOre, rows } = this.locGuideRows(this.activeLocKey);
+    const { ores, rows } = this.locGuideRows(this.activeLocKey);
 
     if (!ores.length) {
       el.innerHTML = `<p class="placeholder">${esc(locName)} no tiene minerales con señal de escáner registrada.</p>`;
@@ -214,10 +200,9 @@ const Signals = {
             return `<td class="sig-loc-cell ${match ? "match" : ""}">${fmtNum(c.value)}</td>`;
           })
           .join("");
-        return `<tr class="sig-loc-row ${sel ? "selected" : ""}" style="--chip-c:${colorByOre[r.oreKey]}" data-ore="${esc(r.oreKey)}">
+        return `<tr class="sig-loc-row ${sel ? "selected" : ""}" data-ore="${esc(r.oreKey)}">
           <th class="sig-loc-mineral-cell" scope="row">
             <div class="sig-loc-mineral-inner">
-              <span class="sig-loc-swatch"></span>
               ${rarityDotHtml(r.oreKey)}
               <span class="sig-loc-mineral-name">${esc(r.oreName)}</span>
               ${r.multiRow ? `<span class="sig-loc-mineral-context">${esc(r.contextLabel)}</span>` : ""}
