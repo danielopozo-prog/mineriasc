@@ -363,7 +363,30 @@ def main() -> int:
     parser.add_argument(
         "--nav-timeout", type=float, default=15.0, help="Segundos maximos para que la pagina termine de cargar (por defecto 15)."
     )
+    parser.add_argument(
+        "--width", type=int, default=None,
+        help=(
+            "Ancho de viewport en px (requiere --height). Sin este flag, Chrome "
+            "headless usa su tamano de ventana por defecto (~758px de ancho), "
+            "insuficiente para verificar breakpoints de escritorio (la web tiene "
+            "max-width 1600px). Usa --width 1900 --height 950 para simular un "
+            "monitor de escritorio real antes de --wait/--eval."
+        ),
+    )
+    parser.add_argument(
+        "--height", type=int, default=None,
+        help="Alto de viewport en px (requiere --width). Ver --width.",
+    )
     args = parser.parse_args()
+
+    if (args.width is None) != (args.height is None):
+        print(
+            json.dumps(
+                {"success": False, "error": "--width y --height deben pasarse juntos."},
+                ensure_ascii=False,
+            )
+        )
+        return 1
 
     root = Path(args.root).resolve()
     if not root.exists():
@@ -384,6 +407,17 @@ def main() -> int:
 
         target_url = urllib.parse.urljoin(f"http://localhost:{args.port}/", args.path.lstrip("/"))
         cdp.send("Runtime.enable")
+        if args.width is not None and args.height is not None:
+            metrics_id = cdp.send(
+                "Emulation.setDeviceMetricsOverride",
+                {
+                    "width": args.width,
+                    "height": args.height,
+                    "deviceScaleFactor": 1,
+                    "mobile": False,
+                },
+            )
+            cdp.wait_result(metrics_id, overall_timeout=5.0)
         try:
             cdp.navigate_and_wait_load(target_url, timeout=args.nav_timeout)
         except TimeoutError as e:

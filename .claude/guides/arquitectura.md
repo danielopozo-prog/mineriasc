@@ -126,6 +126,14 @@ tenga que reinventarlo:
 6. Cierra Chrome siempre; el servidor solo si lo arrancó él mismo (nunca mata uno
    que ya estaba corriendo).
 
+**Viewport de escritorio (`--width`/`--height`)**: sin estos flags, Chrome headless
+abre con su tamaño de ventana por defecto (~758px de ancho), insuficiente para
+verificar breakpoints de escritorio — la web tiene `max-width: 1600px` y el split a
+1 columna solo colapsa por debajo de 800px, así que a ~758px siempre se ve el layout
+móvil aunque el cambio sea de escritorio. Pasa ambos juntos (`--width 1900 --height
+950`) para aplicar `Emulation.setDeviceMetricsOverride` antes de navegar; si se omiten
+los dos, el comportamiento es idéntico al de antes de este flag.
+
 Ejemplo real (usado para verificar que `marketplaceAveragesAll` sirve datos):
 
 ```bash
