@@ -76,7 +76,7 @@ Sin historial conversacional. Si falta contexto, una línea extra: `Contexto min
 
 | Zona | Agente | Dominio |
 |---|---|---|
-| `index.html`, `css/`, `assets/`, `js/finder.js`, `js/locations.js`, `js/refinery.js`, `js/inventory.js`, `js/app.js` | `web-ui` | Las 4 pestañas, marcado, estilos, tipografía vendorizada, render, interacción, exportaciones |
+| `index.html`, `css/`, `assets/`, `js/finder.js`, `js/locations.js`, `js/refinery.js`, `js/inventory.js`, `js/signals.js`, `js/app.js` | `web-ui` | Las 5 pestañas, marcado, estilos, tipografía vendorizada, render, interacción, exportaciones |
 | `data/`, `js/data.js`, `js/uex.js` | `datos-uex` | mining_data.json, índices, cliente UEX, resolución de precios |
 | `README.md`, `CLAUDE.md`, `.claude/` | `web-ui` (docs de producto) / Tech Lead (capa de agentes, editada vía delegación a quien corresponda) | Documentación |
 
@@ -111,7 +111,7 @@ invariante que el gate no comprueba, no está terminado.
 ## Arquitectura (lo que no se ve en un archivo suelto)
 
 Orden de carga de globales: `UEX` → `DATA` (+ utilidades `esc`/`fmtNum`/diccionarios) →
-vistas (`Finder`, `Locations`, `Refinery`, `Inventory`) → `app.js` (arranque). La trampa
+vistas (`Finder`, `Locations`, `Refinery`, `Inventory`, `Signals`) → `app.js` (arranque). La trampa
 de precios UEX (bruto con precio medio 0, sufijos « (Ore)»/« (Raw)», grafía
 Quantanium/Quantainium) está resuelta en `DATA.bestSellFor`/`uexRefinedFor` — detalle en
 `.claude/guides/uex-api.md`. Estructura del JSON y su actualización:

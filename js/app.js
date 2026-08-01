@@ -32,6 +32,7 @@
   Finder.init();
   Locations.init();
   Inventory.init();
+  Signals.init();
 
   // Precios en vivo, sin bloquear la interfaz
   try {

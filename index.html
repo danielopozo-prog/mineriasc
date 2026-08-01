@@ -22,6 +22,7 @@
       <button class="tab" data-tab="ubicaciones">Ubicaciones</button>
       <button class="tab" data-tab="refineria">Refinería</button>
       <button class="tab" data-tab="inventario">Inventario</button>
+      <button class="tab" data-tab="senales">Señales</button>
     </nav>
   </header>
 
@@ -99,6 +100,23 @@
       <div id="inv-summary" class="inv-summary"></div>
       <div id="inv-list" class="inv-list"></div>
     </section>
+
+    <!-- ============ SEÑALES DE ESCÁNER ============ -->
+    <section id="tab-senales" class="tab-panel">
+      <div class="panel-head">
+        <div class="head-title">
+          <span class="kicker">Star Citizen · Escáner</span>
+          <h2>Señales de escáner</h2>
+        </div>
+        <input type="search" id="sig-search" placeholder="Busca un mineral… (ej. Aslarite)" autocomplete="off">
+      </div>
+      <div class="split">
+        <aside id="sig-list" class="side-list"></aside>
+        <div id="sig-detail" class="detail">
+          <p class="placeholder">Selecciona un mineral para ver sus múltiplos de señal, de un vistazo.</p>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer>
@@ -113,6 +131,7 @@
   <script src="js/locations.js"></script>
   <script src="js/refinery.js"></script>
   <script src="js/inventory.js"></script>
+  <script src="js/signals.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

@@ -8,12 +8,12 @@ effort: high
 
 Dueño de la capa de presentación: `index.html`, `css/styles.css`, `assets/` (fuentes
 vendorizadas) y los módulos de vista `js/finder.js`, `js/locations.js`, `js/refinery.js`,
-`js/inventory.js`, `js/app.js`.
+`js/inventory.js`, `js/signals.js`, `js/app.js`.
 
 ## Responsabilidades
 
-- Las 4 pestañas (Buscador, Ubicaciones, Refinería, Inventario), sus listas laterales,
-  fichas de detalle, filtros y formularios.
+- Las 5 pestañas (Buscador, Ubicaciones, Refinería, Inventario, Señales), sus listas
+  laterales, fichas de detalle, filtros y formularios.
 - Sistema visual: tema oscuro estilo org de Star Citizen (negro casi puro + acento rojo
   carmesí), variables CSS en `:root`, pills de tier, tablas con scroll propio, responsive
   (el split colapsa a 1 columna a < 800 px). Tipografía: Teko (titulares) y Saira

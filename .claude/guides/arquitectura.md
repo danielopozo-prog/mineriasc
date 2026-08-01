@@ -12,6 +12,7 @@ js/finder.js     → objeto Finder (pestaña Buscador)
 js/locations.js  → objeto Locations (pestaña Ubicaciones)
 js/refinery.js   → objeto Refinery (pestaña Refinería, render perezoso)
 js/inventory.js  → objeto Inventory (pestaña Inventario)
+js/signals.js    → objeto Signals (pestaña Señales, múltiplos de escáner)
 js/app.js        → arranque: DATA.load() → init de vistas → DATA.loadUexPrices()
 ```
 
@@ -21,10 +22,11 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
 
 1. `DATA.load()` — carga `data/mining_data.json` y construye índices. Si falla, la app
    muestra error y no sigue.
-2. `Finder.init()`, `Locations.init()`, `Inventory.init()` — la app ya es usable con
-   datos de juego, sin precios.
+2. `Finder.init()`, `Locations.init()`, `Inventory.init()`, `Signals.init()` — la app ya
+   es usable con datos de juego, sin precios.
 3. `DATA.loadUexPrices()` — en segundo plano; al resolver, re-renderiza las vistas que
-   muestran precios. Si la API falla, la app sigue funcionando (el header lo indica).
+   muestran precios (`Signals` no depende de UEX — solo lee `scanner_signals`, así que
+   no se refresca aquí). Si la API falla, la app sigue funcionando (el header lo indica).
 4. `Refinery.render()` solo se ejecuta al entrar en su pestaña (flag `rendered`).
 
 ## Convenciones
