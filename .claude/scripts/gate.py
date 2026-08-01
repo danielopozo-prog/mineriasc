@@ -67,24 +67,76 @@ def main():
     except Exception as e:  # noqa: BLE001
         check("mining_data.json parsea", False, str(e))
 
+    # --- multipagina: cada pagina de nivel superior ("hoja" de una app) se
+    # valida por separado (scripts, ids), pero js/ y el gate global siguen
+    # siendo uno solo. Anadir una pagina nueva = anadirla a este dict.
     html = (ROOT / "index.html").read_text(encoding="utf-8")
-    scripts = re.findall(r'<script src="([^"]+)"', html)
-    for s in scripts:
-        check(f"script referenciado existe: {s}", (ROOT / s).exists())
-    js_files = {f"js/{p.name}" for p in (ROOT / "js").glob("*.js")}
-    check("todo js/ esta referenciado en index.html", js_files <= set(scripts),
-          f"huerfanos: {sorted(js_files - set(scripts))}")
+    pages = {"index.html": html}
+    contadores_path = ROOT / "contadores.html"
+    if contadores_path.exists():
+        pages["contadores.html"] = contadores_path.read_text(encoding="utf-8")
 
-    # ids usados por JS existen en el HTML
-    html_ids = set(re.findall(r'id="([^"]+)"', html))
+    page_scripts = {name: re.findall(r'<script src="([^"]+)"', h) for name, h in pages.items()}
+    all_scripts = set().union(*page_scripts.values()) if page_scripts else set()
+    for name, srcs in page_scripts.items():
+        for s in srcs:
+            check(f"{name}: script referenciado existe: {s}", (ROOT / s).exists())
+    js_files = {f"js/{p.name}" for p in (ROOT / "js").glob("*.js")}
+    check("todo js/ esta referenciado en alguna pagina", js_files <= all_scripts,
+          f"huerfanos: {sorted(js_files - all_scripts)}")
+
+    # ids usados por JS existen en el HTML de la(s) pagina(s) que lo cargan
+    page_ids = {name: set(re.findall(r'id="([^"]+)"', h)) for name, h in pages.items()}
+    js_owner = {}
+    for name, srcs in page_scripts.items():
+        for s in srcs:
+            js_owner.setdefault(s, set()).add(name)
+    all_ids = set().union(*page_ids.values()) if page_ids else set()
+    # ids creados dinamicamente por cualquier JS (innerHTML) tambien cuentan
+    dyn = set()
+    for q in (ROOT / "js").glob("*.js"):
+        dyn |= set(re.findall(r'id="([^"]+)"', q.read_text(encoding="utf-8")))
+
     for p in (ROOT / "js").glob("*.js"):
-        used = set(re.findall(r"getElementById\(\s*['\"]([^'\"]+)['\"]\s*\)", p.read_text(encoding="utf-8")))
-        # ids creados dinamicamente por JS (innerHTML) tambien cuentan
-        dyn = set()
-        for q in (ROOT / "js").glob("*.js"):
-            dyn |= set(re.findall(r'id="([^"]+)"', q.read_text(encoding="utf-8")))
-        missing = used - html_ids - dyn
-        check(f"{p.name}: ids existen en el HTML", not missing, f"faltan: {sorted(missing)}")
+        rel = f"js/{p.name}"
+        owners = js_owner.get(rel, set())
+        owner_ids = set().union(*(page_ids[o] for o in owners)) if owners else all_ids
+        src = p.read_text(encoding="utf-8")
+        # getElementById('x') (patron clasico) + $('#x') (helper querySelector
+        # usado por js/contadores.js): ambos son referencias a un id real.
+        used = set(re.findall(r"getElementById\(\s*['\"]([^'\"]+)['\"]\s*\)", src))
+        used |= set(re.findall(r"\$\(\s*['\"]#([A-Za-z0-9_-]+)['\"]", src))
+        missing = used - owner_ids - dyn
+        label = ",".join(sorted(owners)) or "?"
+        check(f"{p.name}: ids existen en su HTML ({label})", not missing, f"faltan: {sorted(missing)}")
+
+    # --- pagina hermana "Contadores" (temporizadores, portada de star-citizen-timers) --
+    check("contadores.html existe", contadores_path.exists())
+    check("css/contadores.css existe", (ROOT / "css" / "contadores.css").exists())
+    check("js/contadores.js existe", (ROOT / "js" / "contadores.js").exists())
+    check("index.html enlaza a contadores.html", 'href="contadores.html"' in html)
+    if contadores_path.exists():
+        chtml = pages["contadores.html"]
+        check("contadores.html enlaza de vuelta a index.html", 'href="index.html"' in chtml)
+        ccss_path = ROOT / "css" / "contadores.css"
+        cjs_path = ROOT / "js" / "contadores.js"
+        if ccss_path.exists() and cjs_path.exists():
+            ccss = ccss_path.read_text(encoding="utf-8")
+            cjs = cjs_path.read_text(encoding="utf-8")
+            # paleta duplicada en JS (favicon en <canvas>, sin acceso a la cascada
+            # CSS): si alguien retoca --ok/--info/--warn/--accent/--dim en
+            # contadores.css sin tocar FAVICON_TONES, el favicon queda desincronizado
+            # en silencio.
+            root_vars = dict(re.findall(r"--(ok|info|warn|accent|dim):\s*(#[0-9a-fA-F]{3,6})", ccss))
+            tones = dict(re.findall(r"(calm|mid|warn|hot|off):\s*'(#[0-9a-fA-F]{3,6})'", cjs))
+            var_to_tone = {"ok": "calm", "info": "mid", "warn": "warn", "accent": "hot", "dim": "off"}
+            mismatches = [
+                f"{cssvar}->{var_to_tone[cssvar]}: css={hexval} js={tones.get(var_to_tone[cssvar])}"
+                for cssvar, hexval in root_vars.items()
+                if var_to_tone.get(cssvar) in tones and tones[var_to_tone[cssvar]].lower() != hexval.lower()
+            ]
+            check("contadores.js: FAVICON_TONES coincide con las variables de contadores.css",
+                  not mismatches, "; ".join(mismatches))
 
     # --- marketplace averages (medias P2P por tramo de calidad) --------
     uex_js = (ROOT / "js" / "uex.js").read_text(encoding="utf-8")
@@ -115,16 +167,15 @@ def main():
     tier_labels_ok = bool(m) and "5: \"Q800-899\"" in (m.group(1) if m else "")
     check("data.js: tramo quality_tier=5 es Q800-899 (verificado, no lineal)", tier_labels_ok)
 
-    # el estatico sigue siendo estatico
+    # el estatico sigue siendo estatico (todas las paginas, todos los CSS)
     check("sin package.json (sin build)", not (ROOT / "package.json").exists())
     cdn_markers = ("cdn.", "unpkg", "jsdelivr", "fonts.googleapis", "fonts.gstatic")
-    check("sin CDNs en index.html", not any(m in html for m in cdn_markers))
-    css_path = ROOT / "css" / "styles.css"
-    if css_path.exists():
+    for name, h in pages.items():
+        check(f"sin CDNs en {name}", not any(m in h for m in cdn_markers))
+    for css_path in (ROOT / "css").glob("*.css"):
         css = css_path.read_text(encoding="utf-8")
-        check("sin CDNs en css/styles.css", not any(m in css for m in cdn_markers))
-    else:
-        check("css/styles.css existe", False)
+        check(f"sin CDNs en css/{css_path.name}", not any(m in css for m in cdn_markers))
+    check("css/styles.css existe", (ROOT / "css" / "styles.css").exists())
 
     print()
     if FAILS:

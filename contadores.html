@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Contadores · Star Citizen — Minería SC</title>
+<meta name="description" content="Panel de temporizadores de Star Citizen: Hangar Ejecutivo, impresoras de tarjetas, bóvedas, ciclo de loot y Compboards. Todo personalizable. Página hermana de Minería SC.">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="stylesheet" href="css/contadores.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230a0a0a'/><circle cx='16' cy='16' r='9' fill='none' stroke='%23d81f2b' stroke-width='3'/></svg>">
+</head>
+<body>
+
+<div class="bg-glow" aria-hidden="true"></div>
+<div class="bg-scan" aria-hidden="true"></div>
+
+<!-- ══════════════════ HEADER ══════════════════ -->
+<header class="topbar">
+  <div class="wrap topbar__in">
+    <a class="brand" href="#top">
+      <span class="brand__mark" aria-hidden="true"></span>
+      <span class="brand__txt">
+        <b>PYRO OPS</b>
+        <i>Star Citizen · Panel de Operaciones</i>
+      </span>
+    </a>
+    <nav class="viewnav" id="viewNav" aria-label="Secciones"></nav>
+    <div class="topbar__right">
+      <a class="btn btn--ghost btn--sm crosslink" href="index.html" title="Volver a Minería SC">⛏ Minería</a>
+      <div class="clock" title="Hora local del sistema">
+        <span class="clock__t" id="clockTime">--:--:--</span>
+        <span class="clock__z" id="clockZone">LOCAL</span>
+      </div>
+      <button class="btn btn--icon" id="btnAlerts" title="Activar/desactivar alertas" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5 2 6H4c.5-1 2-2 2-6Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
+      </button>
+      <button class="btn btn--icon" id="btnSettings" title="Ajustes y personalización">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 8.9 19a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 5 8.9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Miniaturas de los contadores activos, siempre visibles -->
+  <div class="hud" id="hud" hidden>
+    <div class="wrap hud__in">
+      <span class="hud__label">Activos</span>
+      <div class="hud__list" id="hudList"></div>
+    </div>
+  </div>
+
+  <!-- Resumen del panel, visible en todas las vistas -->
+  <div class="herostats-bar">
+    <div class="wrap hero__stats" id="heroStats"></div>
+  </div>
+
+  <div class="hairline"></div>
+</header>
+
+<main id="top">
+
+  <!-- ══════════════════ INICIO ══════════════════ -->
+  <section id="inicio" data-view="inicio" class="wrap hero">
+    <p class="eyebrow">Sistema Pyro · Zonas Disputadas</p>
+    <h1 class="hero__title">PANEL DE <em>TEMPORIZADORES</em></h1>
+    <p class="hero__sub">Hangar Ejecutivo, impresoras de tarjetas, bóvedas, ciclo de reaparición de loot y Compboards.
+      Todos los contadores son personalizables y se guardan en tu navegador.</p>
+
+    <div class="panel panel--about">
+      <p class="eyebrow">Acerca de esta herramienta</p>
+      <h3 class="about__title">HERRAMIENTA NO OFICIAL CREADA POR FANS</h3>
+      <p class="muted">Todos los temporizadores se ejecutan en tu navegador. El estado se guarda en el almacenamiento local,
+      así que persiste aunque cierres la pestaña, y funciona sin conexión tras la primera carga. Sin cuentas ni inicio de sesión.
+      Es la página hermana de <a href="index.html">Minería SC</a>: mismo sitio, distinto propósito.</p>
+      <ul class="about__list">
+        <li>Ciclo del Hangar Ejecutivo con precisión de segundo</li>
+        <li>Impresoras de tarjetas, bóvedas y objetivos de zonas disputadas</li>
+        <li>Ciclo de reaparición de loot por zona</li>
+        <li>Rastreador de Compboards con progreso</li>
+        <li>Cada duración es editable · alertas de sonido y notificación</li>
+        <li>Exporta e importa tu configuración desde Ajustes</li>
+      </ul>
+      <p class="disclaimer">No está afiliada ni respaldada por Cloud Imperium Games. La precisión depende de que el reloj de tu sistema esté correctamente sincronizado. Úsala bajo tu propio riesgo.</p>
+    </div>
+  </section>
+
+  <!-- ══════════════════ HANGAR EJECUTIVO ══════════════════ -->
+  <section id="hangar" data-view="hangar" class="wrap sect">
+    <div class="sect__head">
+      <div>
+        <p class="eyebrow">Ciclo global · sincronizado en todos los servidores</p>
+        <h2 class="sect__title">ESTADO DEL HANGAR EJECUTIVO</h2>
+      </div>
+      <button class="btn btn--ghost btn--sm" data-edit="hangar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        Personalizar
+      </button>
+    </div>
+
+    <div class="panel panel--hangar" id="hangarPanel">
+      <div class="hangar__grid">
+
+        <div class="hangar__phase">
+          <div class="phase" id="phaseBadge">
+            <span class="phase__dot"></span>
+            <span class="phase__name" id="phaseName">—</span>
+          </div>
+          <p class="phase__desc" id="phaseDesc">Sin sincronizar</p>
+          <p class="phase__next">Siguiente: <b id="phaseNext">—</b></p>
+        </div>
+
+        <div class="hangar__count">
+          <p class="eyebrow" id="countLabel">Tiempo restante</p>
+          <div class="bigclock" id="hangarCountdown">--:--</div>
+          <p class="muted sm" id="hangarUntil">—</p>
+        </div>
+
+        <div class="hangar__leds">
+          <p class="eyebrow">Luces de estado del hangar</p>
+          <div class="leds" id="hangarLeds"></div>
+          <p class="muted xs">Se apagan una a una según se acerca el cierre · Vuelven a encenderse en rojo antes de reabrir</p>
+        </div>
+      </div>
+
+      <div class="progress" title="Progreso del ciclo completo">
+        <div class="progress__bar" id="hangarProgress"></div>
+      </div>
+      <div class="progress__meta">
+        <span class="muted xs">Progreso del ciclo</span>
+        <span class="mono xs" id="hangarProgressTxt">0%</span>
+      </div>
+
+      <div class="hangar__actions">
+        <button class="btn btn--primary" id="btnSyncHangar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+          Se abre ahora
+        </button>
+        <button class="btn btn--ghost" id="btnSyncHangarRed">Se acaba de cerrar</button>
+        <button class="btn btn--ghost" id="btnFetchCz">Actualizar desde cztimer</button>
+        <button class="btn btn--ghost" id="btnResetHangar">Volver al ciclo oficial</button>
+      </div>
+      <p class="note" id="hangarNote"></p>
+    </div>
+  </section>
+
+  <!-- ══════════════════ CICLO DE LOOT ══════════════════ -->
+  <section id="loot" data-view="loot" class="wrap sect">
+    <div class="sect__head">
+      <div>
+        <p class="eyebrow">Reaparición de botín · ciclo aproximado de 60 min</p>
+        <h2 class="sect__title">CICLO DE SPAWN DEL LOOT</h2>
+      </div>
+      <button class="btn btn--ghost btn--sm" id="btnAddLoot">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Añadir zona
+      </button>
+    </div>
+    <div class="cards" id="lootGrid"></div>
+    <p class="note">El ciclo de loot es <b>aproximado</b> y puede variar entre parches y servidores. Ajusta la duración de cada zona con el icono ✎ hasta que cuadre con lo que observes en el juego.</p>
+  </section>
+
+  <!-- ══════════════════ ZONAS DISPUTADAS ══════════════════ -->
+  <section id="zonas" data-view="zonas" class="wrap sect">
+    <div class="sect__head">
+      <div>
+        <p class="eyebrow">Rastrea impresoras de tarjetas y objetivos</p>
+        <h2 class="sect__title">TEMPORIZADORES DE ZONAS DISPUTADAS</h2>
+      </div>
+      <button class="btn btn--ghost btn--sm" id="btnResetTimers">Reiniciar todos</button>
+    </div>
+    <div id="stations"></div>
+    <p class="note"><b>Todas las impresoras</b> tienen enfriamiento configurable (30 min por defecto). Inicia el temporizador en cuanto tú o tu equipo activéis una impresora para saber cuándo vuelve a estar lista.</p>
+  </section>
+
+  <!-- ══════════════════ TEMPORIZADORES PROPIOS ══════════════════ -->
+  <section id="custom" data-view="custom" class="wrap sect">
+    <div class="sect__head">
+      <div>
+        <p class="eyebrow">Tus contadores</p>
+        <h2 class="sect__title">TEMPORIZADORES PERSONALIZADOS</h2>
+      </div>
+      <button class="btn btn--ghost btn--sm" id="btnAddCustom">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Nuevo temporizador
+      </button>
+    </div>
+    <div class="cards" id="customGrid"></div>
+    <p class="empty" id="customEmpty">No tienes temporizadores propios todavía. Crea uno para cualquier ciclo que quieras seguir.</p>
+  </section>
+
+  <!-- ══════════════════ COMPBOARDS ══════════════════ -->
+  <section id="boards" data-view="boards" class="wrap sect">
+    <div class="sect__head">
+      <div>
+        <p class="eyebrow">Recolecta los 7 Compboards únicos para desbloquear el Hangar Ejecutivo</p>
+        <h2 class="sect__title">RECOLECCIÓN DE COMPBOARDS</h2>
+      </div>
+      <div class="boards__count"><b id="boardsCount">0</b><span>/7</span></div>
+    </div>
+    <div class="progress"><div class="progress__bar progress__bar--ok" id="boardsProgress"></div></div>
+    <div class="cards cards--boards" id="boardsGrid"></div>
+    <button class="btn btn--ghost btn--sm" id="btnResetBoards">Restablecer todos los tableros</button>
+  </section>
+
+  <!-- ══════════════════ GUÍA ══════════════════ -->
+  <section id="guia" data-view="guia" class="wrap sect">
+    <div class="sect__head">
+      <div>
+        <p class="eyebrow">Información esencial para operaciones</p>
+        <h2 class="sect__title">GUÍA DE REFERENCIA RÁPIDA</h2>
+      </div>
+    </div>
+    <div class="cards cards--guide" id="guideGrid"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="hairline"></div>
+  <div class="wrap foot__in">
+    <span>PYRO OPS · Panel de temporizadores · Hermana de <a href="index.html">Minería SC</a></span>
+    <span class="muted xs">Datos del ciclo: investigación y pruebas de la comunidad</span>
+  </div>
+</footer>
+
+<!-- ══════════════════ DIÁLOGO: EDITAR ══════════════════ -->
+<dialog class="dlg" id="dlgEdit">
+  <form method="dialog" class="dlg__in" id="formEdit">
+    <p class="eyebrow" id="editEyebrow">Personalizar</p>
+    <h3 class="dlg__title" id="editTitle">Temporizador</h3>
+    <div class="dlg__body" id="editBody"></div>
+    <div class="dlg__actions">
+      <button class="btn btn--ghost" value="cancel" formnovalidate>Cancelar</button>
+      <button class="btn btn--primary" value="ok" id="editOk">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ══════════════════ DIÁLOGO: AJUSTES ══════════════════ -->
+<dialog class="dlg dlg--wide" id="dlgSettings">
+  <form method="dialog" class="dlg__in">
+    <p class="eyebrow">Configuración global</p>
+    <h3 class="dlg__title">AJUSTES</h3>
+
+    <div class="dlg__body">
+      <fieldset class="fs">
+        <legend>Hangar Ejecutivo</legend>
+        <label class="fld"><span>Ciclo completo (min)</span><input type="number" id="setHangarCycle" min="1" max="1440" step="0.1"></label>
+        <label class="fld"><span>Fase verde / abierto (min)</span><input type="number" id="setHangarGreen" min="1" max="1440" step="0.1"></label>
+        <p class="hint">La fase roja se calcula sola: <b id="setHangarRed">—</b> min.</p>
+      </fieldset>
+
+      <fieldset class="fs">
+        <legend>Valores por defecto</legend>
+        <label class="fld"><span>Enfriamiento de impresoras (min)</span><input type="number" id="setPrinter" min="0.1" max="1440" step="0.1"></label>
+        <label class="fld"><span>Ciclo de loot por defecto (min)</span><input type="number" id="setLoot" min="0.1" max="1440" step="0.1"></label>
+        <p class="hint">Cambiar esto solo afecta a los temporizadores que no hayas personalizado uno a uno.</p>
+      </fieldset>
+
+      <fieldset class="fs">
+        <legend>Bóveda de Ruin Station</legend>
+        <label class="fld"><span>Abierta (min)</span><input type="number" id="setVaultOpen" min="0.1" max="600" step="0.1"></label>
+        <label class="fld"><span>Cerrada (min)</span><input type="number" id="setVaultClosed" min="0.1" max="600" step="0.1"></label>
+      </fieldset>
+
+      <fieldset class="fs">
+        <legend>Alertas</legend>
+        <label class="chk"><input type="checkbox" id="setSound"><span>Sonido al terminar</span></label>
+        <label class="chk"><input type="checkbox" id="setNotify"><span>Notificaciones del navegador</span></label>
+        <label class="fld"><span>Aviso previo (segundos)</span><input type="number" id="setLead" min="0" max="600" step="5"></label>
+        <label class="fld"><span>Volumen</span><input type="range" id="setVolume" min="0" max="1" step="0.05"></label>
+      </fieldset>
+
+      <fieldset class="fs">
+        <legend>Datos</legend>
+        <div class="row">
+          <button type="button" class="btn btn--ghost btn--sm" id="btnExport">Exportar</button>
+          <button type="button" class="btn btn--ghost btn--sm" id="btnImport">Importar</button>
+          <button type="button" class="btn btn--danger btn--sm" id="btnWipe">Borrar todo</button>
+        </div>
+        <input type="file" id="fileImport" accept="application/json" hidden>
+      </fieldset>
+    </div>
+
+    <div class="dlg__actions">
+      <button class="btn btn--ghost" value="cancel" formnovalidate>Cerrar</button>
+      <button class="btn btn--primary" value="ok">Guardar ajustes</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ══════════════════ DIÁLOGO: VISTAS ══════════════════ -->
+<dialog class="dlg" id="dlgViews">
+  <div class="dlg__in">
+    <p class="eyebrow">Pestañas de la barra de secciones</p>
+    <h3 class="dlg__title">EDITAR VISTAS</h3>
+    <div class="dlg__body" id="viewEditor"></div>
+    <div class="dlg__actions">
+      <button class="btn btn--ghost" id="btnResetViews">Restablecer</button>
+      <button class="btn btn--primary" id="btnCloseViews">Cerrar</button>
+    </div>
+  </div>
+</dialog>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="js/contadores.js"></script>
+</body>
+</html>

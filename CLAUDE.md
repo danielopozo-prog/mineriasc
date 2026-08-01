@@ -76,7 +76,8 @@ Sin historial conversacional. Si falta contexto, una línea extra: `Contexto min
 
 | Zona | Agente | Dominio |
 |---|---|---|
-| `index.html`, `css/`, `assets/`, `js/finder.js`, `js/locations.js`, `js/refinery.js`, `js/inventory.js`, `js/signals.js`, `js/app.js` | `web-ui` | Las 5 pestañas, marcado, estilos, tipografía vendorizada, render, interacción, exportaciones |
+| `index.html`, `css/styles.css`, `assets/`, `js/finder.js`, `js/locations.js`, `js/refinery.js`, `js/inventory.js`, `js/signals.js`, `js/app.js` | `web-ui` | Las 5 pestañas, marcado, estilos, tipografía vendorizada, render, interacción, exportaciones |
+| `contadores.html`, `css/contadores.css`, `js/contadores.js` | `web-ui` | Página hermana de temporizadores SC (Hangar Ejecutivo, impresoras, loot, Compboards), enlazada desde la cabecera; localStorage propio (`pyro-ops-v1`), sin cruce con `mineriasc_*` |
 | `data/`, `js/data.js`, `js/uex.js` | `datos-uex` | mining_data.json, índices, cliente UEX, resolución de precios |
 | `README.md`, `CLAUDE.md`, `.claude/` | `web-ui` (docs de producto) / Tech Lead (capa de agentes, editada vía delegación a quien corresponda) | Documentación |
 

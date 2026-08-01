@@ -73,6 +73,30 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
     bajo "Favoritos" arriba de la lista lateral, y se priorizan (antes que
     la cercanía) al ordenar los resultados de la búsqueda inversa.
 
+## Página hermana: `contadores.html`
+
+El sitio tiene una segunda página estática, independiente de la de arriba: temporizadores
+de Star Citizen (Hangar Ejecutivo, impresoras de tarjetas, bóveda, loot, Compboards),
+portada del proyecto hermano `star-citizen-timers` y retemada a la paleta/tipografía de
+este sitio (mismo `assets/fonts/*.woff2`, sin CDN).
+
+- Carga: `contadores.html` → `css/contadores.css` (propio, no comparte cascada con
+  `css/styles.css`) → `js/contadores.js` (IIFE autocontenida, sin dependencia de
+  `DATA`/`UEX`/otros módulos de arriba).
+- Estado propio en `localStorage['pyro-ops-v1']` (namespace ajeno a `mineriasc_*`,
+  verificado sin colisión). La vista activa vive en `location.hash`, nunca en el
+  estado guardado (dos pestañas del navegador no deben arrastrarse la sección visible
+  la una a la otra).
+- `js/contadores.js` no usa `getElementById`: usa un helper `$('#id')`
+  (`querySelector`) — el gate lo busca con una segunda expresión regular además de
+  `getElementById(...)`.
+- Paleta duplicada en JS: `FAVICON_TONES` (pinta el favicon en `<canvas>`, sin acceso a
+  la cascada CSS) debe coincidir con `--ok/--info/--warn/--accent/--dim` de
+  `css/contadores.css`; el gate lo compara.
+- Navegación cruzada: `index.html` enlaza a `contadores.html` (botón «⏱ Contadores» en
+  la cabecera) y `contadores.html` enlaza de vuelta a `index.html` (both en la
+  cabecera y en el pie); el gate comprueba que ambos `href` existan.
+
 ## Verificación real en navegador (`.claude/scripts/browser_check.py`)
 
 El gate (`gate.py`) es estático: comprueba texto y estructura de archivos, no que la
