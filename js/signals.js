@@ -39,6 +39,22 @@ const SIGNAL_CONTEXT_ES = {
   vehicle: "Vehículo (ROC)",
 };
 
+// Método de minado por ubicación (claves de DATA.locationOres[locKey].ores:
+// fps/vehicle/ship — comprobado, ningún mineral aparece bajo dos métodos
+// distintos en la misma ubicación en el parche actual, así que 1 fila =
+// 1 método sin ambigüedad). Distinto de SIGNAL_CONTEXT_ES: aquello es el
+// contexto que hace sonar el escáner (asteroid/surface/fps/vehicle);
+// esto es cómo se extrae el depósito en ESTA ubicación concreta. Reusa
+// METHOD_ES (data.js) para el texto largo (tabla de Ubicaciones/Buscador);
+// aquí, en la columna fija de la matriz, una versión corta para no inflar
+// el ancho de la columna sticky.
+const LOC_METHOD_SHORT_ES = {
+  fps: "A pie",
+  vehicle: "ROC",
+  ship: "Nave",
+};
+const LOC_METHOD_ORDER = ["fps", "vehicle", "ship"];
+
 const SIGNAL_MULTIPLIERS = 15;
 const FAVORITES_KEY = "mineriasc_favorites";
 
@@ -48,6 +64,10 @@ const Signals = {
   // locKey de la ubicación activa en el modo "por ubicación", o null si el
   // modo no está activo (vista normal por mineral).
   activeLocKey: null,
+  // Métodos activos del filtro "por ubicación" (fps/vehicle/ship). Vacío =
+  // sin filtrar, se muestran todas las filas — se reinicia al cambiar de
+  // ubicación (selectLocation/clearLocation).
+  locMethodFilter: new Set(),
 
   init() {
     this.favorites = this.loadFavorites();
@@ -102,20 +122,21 @@ const Signals = {
     document.getElementById("sig-loc-back").addEventListener("click", () => this.clearLocation());
   },
 
-  // Minerales presentes en una ubicación (todos los métodos de minado
-  // fusionados, sin duplicados), limitados a los que tienen ficha en
-  // DATA.ores (descarta los UNKNOWN_* sin identificar todavía) y al menos
-  // una señal de escáner conocida (si no, no hay nada que mostrar de él).
+  // Minerales presentes en una ubicación, con su método de minado (fps/
+  // vehicle/ship — ver LOC_METHOD_SHORT_ES arriba), limitados a los que
+  // tienen ficha en DATA.ores (descarta los UNKNOWN_* sin identificar
+  // todavía) y al menos una señal de escáner conocida (si no, no hay nada
+  // que mostrar de él).
   oresAtLocation(locKey) {
     const loc = DATA.locationOres[locKey];
     if (!loc) return [];
-    const keys = new Set();
-    for (const list of Object.values(loc.ores || {})) {
-      for (const e of list) keys.add(e.ore);
+    const methodByOre = new Map();
+    for (const [method, list] of Object.entries(loc.ores || {})) {
+      for (const e of list) methodByOre.set(e.ore, method);
     }
-    return [...keys]
+    return [...methodByOre.keys()]
       .filter((k) => DATA.ores[k] && (DATA.oreToSignals[k] || []).length)
-      .map((k) => ({ key: k, ore: DATA.ores[k] }))
+      .map((k) => ({ key: k, ore: DATA.ores[k], method: methodByOre.get(k) }))
       .sort((a, b) => a.ore.display_name.localeCompare(b.ore.display_name));
   },
 
@@ -130,7 +151,7 @@ const Signals = {
     const ores = this.oresAtLocation(locKey);
 
     const rows = [];
-    for (const { key, ore } of ores) {
+    for (const { key, ore, method } of ores) {
       const groups = this.groupSignals(DATA.oreToSignals[key] || []);
       for (const g of groups) {
         const contextLabel = [...g.contexts]
@@ -144,6 +165,7 @@ const Signals = {
         rows.push({
           oreKey: key,
           oreName: ore.display_name,
+          method,
           multiRow: groups.length > 1,
           contextLabel,
           base: g.value,
@@ -157,6 +179,7 @@ const Signals = {
 
   selectLocation(locKey) {
     this.activeLocKey = locKey || null;
+    this.locMethodFilter = new Set();
     document.getElementById("sig-split").hidden = !!this.activeLocKey;
     document.getElementById("sig-loc-back").hidden = !this.activeLocKey;
     this.renderLocGuide();
@@ -178,18 +201,40 @@ const Signals = {
 
     const loc = DATA.locationOres[this.activeLocKey];
     const locName = loc?.name || "esta ubicación";
-    const { ores, rows } = this.locGuideRows(this.activeLocKey);
+    const { ores, rows: allRows } = this.locGuideRows(this.activeLocKey);
 
     if (!ores.length) {
       el.innerHTML = `<p class="placeholder">${esc(locName)} no tiene minerales con señal de escáner registrada.</p>`;
       return;
     }
 
+    // Métodos presentes en esta ubicación, en orden fijo (a pie -> ROC ->
+    // nave). Los chips de filtro solo se muestran si hay más de uno: si
+    // toda la ubicación se mina igual (p. ej. un cinturón solo minable en
+    // nave) filtrar no aporta nada, y el badge de cada fila ya lo deja claro.
+    const methodsPresent = LOC_METHOD_ORDER.filter((m) => ores.some((o) => o.method === m));
+    const rows = this.locMethodFilter.size
+      ? allRows.filter((r) => this.locMethodFilter.has(r.method))
+      : allRows;
+
     const target = this.parseReverseInput(document.getElementById("sig-reverse-input").value);
 
     const headCells = Array.from({ length: SIGNAL_MULTIPLIERS }, (_, i) => SIGNAL_MULTIPLIERS - i)
       .map((m) => `<th>×${m}</th>`)
       .join("");
+
+    const filtersHtml =
+      methodsPresent.length > 1
+        ? `<div class="sig-loc-method-filters">
+            <span class="hint">Método de minado:</span>
+            ${methodsPresent
+              .map((m) => {
+                const active = this.locMethodFilter.has(m);
+                return `<button type="button" class="sig-loc-method-filter method-${esc(m)} ${active ? "active" : ""}" data-method="${esc(m)}">${esc(LOC_METHOD_SHORT_ES[m] || m)}</button>`;
+              })
+              .join("")}
+          </div>`
+        : "";
 
     const rowsHtml = rows
       .map((r) => {
@@ -200,11 +245,13 @@ const Signals = {
             return `<td class="sig-loc-cell ${match ? "match" : ""}">${fmtNum(c.value)}</td>`;
           })
           .join("");
+        const methodBadge = `<span class="sig-loc-method-badge method-${esc(r.method)}" title="Método de minado: ${esc(LOC_METHOD_SHORT_ES[r.method] || r.method)}">${esc(LOC_METHOD_SHORT_ES[r.method] || r.method)}</span>`;
         return `<tr class="sig-loc-row ${sel ? "selected" : ""}" data-ore="${esc(r.oreKey)}">
           <th class="sig-loc-mineral-cell" scope="row">
             <div class="sig-loc-mineral-inner">
               ${rarityDotHtml(r.oreKey)}
               <span class="sig-loc-mineral-name">${esc(r.oreName)}</span>
+              ${methodBadge}
               ${r.multiRow ? `<span class="sig-loc-mineral-context">${esc(r.contextLabel)}</span>` : ""}
               ${this.favStarHtml(r.oreKey)}
             </div>
@@ -214,15 +261,20 @@ const Signals = {
       })
       .join("");
 
+    const bodyHtml = rows.length
+      ? rowsHtml
+      : `<tr><td class="placeholder" colspan="${SIGNAL_MULTIPLIERS + 1}">Ningún mineral coincide con el método elegido.</td></tr>`;
+
     el.innerHTML = `
       <div class="sig-loc-guide-head">
         <h3>${esc(locName)}</h3>
         <span class="hint">${ores.length} mineral${ores.length === 1 ? "" : "es"} · ${rows.length} fila${rows.length === 1 ? "" : "s"} de valores base, de mayor a menor</span>
       </div>
+      ${filtersHtml}
       <div class="sig-loc-matrix-wrap">
         <table class="sig-loc-matrix">
           <thead><tr><th class="sig-loc-mineral-h" scope="col">Mineral</th>${headCells}</tr></thead>
-          <tbody>${rowsHtml}</tbody>
+          <tbody>${bodyHtml}</tbody>
         </table>
       </div>`;
 
@@ -230,6 +282,14 @@ const Signals = {
     el.querySelectorAll(".sig-loc-row").forEach((tr) =>
       tr.addEventListener("click", () => {
         this.toggleSelect(tr.dataset.ore);
+        this.renderLocGuide();
+      })
+    );
+    el.querySelectorAll(".sig-loc-method-filter").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        const m = btn.dataset.method;
+        if (this.locMethodFilter.has(m)) this.locMethodFilter.delete(m);
+        else this.locMethodFilter.add(m);
         this.renderLocGuide();
       })
     );

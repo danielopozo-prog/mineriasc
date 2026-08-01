@@ -996,6 +996,54 @@ footer a { color: var(--info); text-decoration: none; }
   text-transform: uppercase;
   letter-spacing: 0.2px;
 }
+
+/* Método de minado (fps/vehicle/ship) de cada fila de la matriz "por
+   ubicación" — ver LOC_METHOD_SHORT_ES en signals.js. Un color por método,
+   siempre acompañado de texto (nunca solo color), para que a pie/ROC/nave
+   se distingan de un vistazo incluso en ubicaciones donde se mezclan. */
+.sig-loc-method-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 20px;
+  font-family: var(--font-ui);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border: 1px solid var(--border-muted);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.sig-loc-method-badge.method-fps { border-color: var(--good); color: var(--good); }
+.sig-loc-method-badge.method-vehicle { border-color: var(--info); color: var(--info); }
+.sig-loc-method-badge.method-ship { border-color: var(--accent-2); color: var(--accent-2); }
+
+/* Chips de filtro por método, encima de la matriz — mismo código de color
+   que el badge, pero apagados hasta que se activan (varias veces uno a la
+   vez, como los favoritos: alternan en un Set). */
+.sig-loc-method-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.sig-loc-method-filter {
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--panel);
+  border: 1px solid var(--border-muted);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.sig-loc-method-filter:hover { background: var(--panel-hover); }
+.sig-loc-method-filter.method-fps.active { border-color: var(--good); color: var(--good); background: rgba(76, 217, 123, 0.14); }
+.sig-loc-method-filter.method-vehicle.active { border-color: var(--info); color: var(--info); background: rgba(77, 163, 255, 0.14); }
+.sig-loc-method-filter.method-ship.active { border-color: var(--accent-2); color: var(--accent-2); background: rgba(255, 106, 61, 0.14); }
 .sig-loc-row {
   cursor: pointer;
   transition: background 0.12s;
