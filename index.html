@@ -41,7 +41,15 @@
           <span class="kicker">Star Citizen · Minerales</span>
           <h2>Buscador de minerales</h2>
         </div>
-        <input type="search" id="ore-search" placeholder="Busca un mineral… (ej. Quantanium)" autocomplete="off">
+        <div class="panel-head-actions">
+          <input type="search" id="ore-search" placeholder="Busca un mineral… (ej. Quantanium)" autocomplete="off">
+          <select id="ore-sort" title="Ordenar por">
+            <option value="alpha">Alfabético (A-Z)</option>
+            <option value="refined">Precio refinado</option>
+            <option value="p2p">Precio P2P (Marketplace)</option>
+            <option value="rarity">Rareza</option>
+          </select>
+        </div>
       </div>
       <div class="split">
         <aside id="ore-list" class="side-list"></aside>
@@ -58,7 +66,13 @@
           <span class="kicker">Star Citizen · Sistemas</span>
           <h2>Explorador de ubicaciones</h2>
         </div>
-        <div class="filter-row" id="system-filter"></div>
+        <div class="panel-head-actions">
+          <div class="filter-row" id="system-filter"></div>
+          <select id="loc-sort" title="Ordenar por">
+            <option value="alpha">Nombre (A-Z)</option>
+            <option value="ores">Nº de minerales</option>
+          </select>
+        </div>
       </div>
       <div class="split">
         <aside id="loc-list" class="side-list"></aside>
@@ -155,7 +169,14 @@
           <span class="kicker">Star Citizen · Fabricación</span>
           <h2>Crafteo</h2>
         </div>
-        <select id="craft-material-select"></select>
+        <div class="panel-head-actions">
+          <select id="craft-material-select"></select>
+          <select id="craft-material-sort" title="Ordenar por">
+            <option value="name">Nombre (A-Z)</option>
+            <option value="count">Nº de objetos</option>
+            <option value="rarity">Rareza</option>
+          </select>
+        </div>
       </div>
       <p class="hint" id="craft-count-hint"></p>
       <div id="craft-filters" class="craft-filters" hidden></div>

@@ -189,6 +189,29 @@ function craftWeaponType(category) {
   return CRAFT_WEAPON_TYPE_ES[parts[1]] ? parts[1] : null;
 }
 
+/* ---------- Rareza de un material de crafteo (para el criterio de orden "rareza") ----------
+   Resuelve el material al mineral de DATA.ores vía DATA.oreKeyForCraftMaterial
+   (contrato expuesto por datos-uex a petición de esta vista — ver
+   .claude/guides/datos-juego.md): resolutor INVERSO de la normalización que
+   ya usa craftByMaterial (CRAFT_NAME_OVERRIDES + craftBaseName), así que
+   cubre los 36 materiales reales del parche actual, incluidos los dos casos
+   de grafía distinta entre sc-craft.tools y mining_data.json ("Aluminum"
+   -> ALUMINUM, "Quantainium" -> QUANTANIUM). Solo queda sin rareza resuelta
+   "Pressurized Ice" — no es el ICE de minería, no tiene entrada en `ores`,
+   caso real y esperado (no un hueco de cobertura) — y cualquier material con
+   rareza no fiable en mining_data.json (DATA.rarityFor ya devuelve null en
+   ese caso). Ambos van al final del orden, igual que el resto de "sin dato". */
+function craftMaterialRarity(rawName) {
+  const oreKey = DATA.oreKeyForCraftMaterial(rawName);
+  return oreKey ? DATA.rarityFor(oreKey) : null;
+}
+
+const CRAFT_MATERIAL_SORT_LABELS = {
+  name: "Nombre (A-Z)",
+  count: "Nº de objetos",
+  rarity: "Rareza",
+};
+
 const Crafting = {
   selectedMaterial: null, // rawName tal cual aparece en ingredients[].name, o null
   selectedBlueprintId: null,
@@ -203,6 +226,8 @@ const Crafting = {
   // las dos; entre grupos es un AND: "Pesada" + "Casco" = solo cascos
   // pesados). Se vacían por completo al cambiar de material.
   filters: { weight: new Set(), piece: new Set(), weaponType: new Set() },
+  materialSort: "name",
+  MATERIAL_SORT_KEY: "mineriasc_crafting_sort",
 
   init() {
     if (!DATA.craft.ready) {
@@ -210,16 +235,39 @@ const Crafting = {
       return;
     }
 
+    this.materialSort = this.loadMaterialSort();
+    const sortSel = document.getElementById("craft-material-sort");
+    sortSel.value = this.materialSort;
+    sortSel.addEventListener("change", () => {
+      this.materialSort = sortSel.value;
+      this.saveMaterialSort();
+      this.renderMaterialOptions();
+    });
+
     const sel = document.getElementById("craft-material-select");
-    const materials = this.materialsIndex();
-    sel.innerHTML =
-      '<option value="" disabled selected>Elige un material…</option>' +
-      materials.map((m) => `<option value="${esc(m.rawName)}">${esc(m.label)} (${m.count})</option>`).join("");
+    this.renderMaterialOptions();
     SearchSelect.enhance(sel, { placeholder: "Buscar material…" });
     sel.addEventListener("change", () => this.selectMaterial(sel.value));
 
     this.renderFilters();
     this.renderList();
+  },
+
+  loadMaterialSort() {
+    try {
+      const v = localStorage.getItem(this.MATERIAL_SORT_KEY);
+      return v && CRAFT_MATERIAL_SORT_LABELS[v] ? v : "name";
+    } catch (_) {
+      return "name";
+    }
+  },
+
+  saveMaterialSort() {
+    try {
+      localStorage.setItem(this.MATERIAL_SORT_KEY, this.materialSort);
+    } catch (_) {
+      // sin localStorage disponible: el criterio sigue activo esta sesión
+    }
   },
 
   // Materiales que aparecen en algún ingrediente de algún plano, con cuántos
@@ -231,6 +279,8 @@ const Crafting = {
   // DATA.craftByMaterial(), que ya sabe normalizarlo (craftBaseName). `label`
   // solo pela el sufijo "(Ore)" para que el combo no muestre "Saldynium
   // (Ore)" — normalización puramente de presentación, no toca el índice.
+  // Sin ordenar a propósito: el orden lo decide renderMaterialOptions()
+  // según this.materialSort.
   materialsIndex() {
     const map = new Map();
     for (const bp of DATA.craftBlueprints()) {
@@ -247,9 +297,51 @@ const Crafting = {
         entry.blueprintIds.add(bp.id);
       }
     }
-    return [...map.values()]
-      .map((e) => ({ label: e.label, rawName: e.rawName, count: e.blueprintIds.size }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+    return [...map.values()].map((e) => ({ label: e.label, rawName: e.rawName, count: e.blueprintIds.size }));
+  },
+
+  // Reconstruye las <option> de #craft-material-select en el orden elegido,
+  // conservando la selección actual (si había una) y sincronizando el combo
+  // con buscador (js/searchselect.js): reasignar sel.innerHTML no dispara
+  // "change", así que hay que restaurar sel.value a mano y llamar a
+  // _sselApi.sync() para refrescar la etiqueta visible del combo — el
+  // MutationObserver interno de SearchSelect ya se encarga de refrescar el
+  // panel de opciones si estaba abierto en ese momento.
+  renderMaterialOptions() {
+    const sel = document.getElementById("craft-material-select");
+    const currentValue = sel.value;
+    const materials = this.materialsIndex();
+
+    let sorted;
+    if (this.materialSort === "count") {
+      // Descendente por defecto: el material con más objetos crafteables arriba.
+      sorted = [...materials].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    } else if (this.materialSort === "rarity") {
+      sorted = [...materials].sort((a, b) => {
+        const ra = craftMaterialRarity(a.rawName);
+        const rb = craftMaterialRarity(b.rawName);
+        const va = ra ? RARITY_ORDER[ra.tier] : null;
+        const vb = rb ? RARITY_ORDER[rb.tier] : null;
+        if (va == null && vb == null) return a.label.localeCompare(b.label);
+        if (va == null) return 1; // sin rareza conocida -> al final
+        if (vb == null) return -1;
+        return vb - va; // legendaria primero
+      });
+    } else {
+      sorted = [...materials].sort((a, b) => a.label.localeCompare(b.label));
+    }
+
+    sel.innerHTML =
+      `<option value="" disabled ${currentValue ? "" : "selected"}>Elige un material…</option>` +
+      sorted
+        .map(
+          (m) =>
+            `<option value="${esc(m.rawName)}">${esc(m.label)} · ${m.count} objeto${m.count === 1 ? "" : "s"}</option>`
+        )
+        .join("");
+
+    if (currentValue) sel.value = currentValue;
+    sel._sselApi?.sync();
   },
 
   selectMaterial(rawName) {

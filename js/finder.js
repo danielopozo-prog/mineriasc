@@ -39,29 +39,110 @@ function rarityBadgeHtml(oreKey) {
   return `<span class="pill rarity-pill tier-${esc(r.tier)}">${esc(r.label)}</span>`;
 }
 
+// Etiquetas del <select> de orden (#ore-sort) — el propio <select> ya sirve
+// de "indicador claro del criterio activo" (su .value refleja la elección),
+// no hace falta un indicador aparte.
+const FINDER_SORT_LABELS = {
+  alpha: "Alfabético (A-Z)",
+  refined: "Precio refinado",
+  p2p: "Precio P2P (Marketplace)",
+  rarity: "Rareza",
+};
+
+// Valor numérico para ordenar por un criterio no alfabético. null = "sin
+// dato" (nunca se inventa un valor) — Finder.renderList() manda esos al
+// final de la lista, cualquiera que sea el criterio.
+//   - "refined": DATA.uexRefinedFor(oreKey).price_sell — precio UEX del
+//     mineral YA refinado (una commodity distinta del bruto). No todo
+//     mineral tiene variante refinada (p.ej. Ice no se refina) -> null.
+//   - "p2p": mejor precio medio del Marketplace P2P por SCU (nunca se
+//     mezcla con precios por unidad suelta/pack/caja — magnitudes
+//     distintas, ver comentario de marketplaceAvgFor en data.js). Los
+//     minerales que solo se trafican en unidades pequeñas (13 en el parche
+//     actual) no tienen fila "scu" -> null, no "inventar" convirtiendo su
+//     precio por unidad.
+//   - "rarity": DATA.rarityFor(oreKey).tier vía RARITY_ORDER (0=común …
+//     4=legendaria, ya definido en data.js) — null si mining_data.json no
+//     trae tier fiable para ese mineral.
+function finderSortValue(oreKey, criterion) {
+  if (criterion === "refined") {
+    const c = DATA.uexRefinedFor(oreKey);
+    return c && c.price_sell > 0 ? c.price_sell : null;
+  }
+  if (criterion === "p2p") {
+    const rows = DATA.marketplaceAvgFor(oreKey).filter((r) => r.unit === "scu");
+    return rows.length ? Math.max(...rows.map((r) => r.priceAvg)) : null;
+  }
+  if (criterion === "rarity") {
+    const r = DATA.rarityFor(oreKey);
+    return r ? RARITY_ORDER[r.tier] : null;
+  }
+  return null;
+}
+
 const Finder = {
   selected: null,
+  sortBy: "alpha",
+  SORT_KEY: "mineriasc_finder_sort",
 
   init() {
+    this.sortBy = this.loadSort();
+    const sortSel = document.getElementById("ore-sort");
+    sortSel.value = this.sortBy;
+    sortSel.addEventListener("change", () => {
+      this.sortBy = sortSel.value;
+      this.saveSort();
+      this.renderList(document.getElementById("ore-search").value.trim().toLowerCase());
+    });
+
     document.getElementById("ore-search").addEventListener("input", (e) => {
       this.renderList(e.target.value.trim().toLowerCase());
     });
     this.renderList("");
   },
 
+  loadSort() {
+    try {
+      const v = localStorage.getItem(this.SORT_KEY);
+      return v && FINDER_SORT_LABELS[v] ? v : "alpha";
+    } catch (_) {
+      return "alpha";
+    }
+  },
+
+  saveSort() {
+    try {
+      localStorage.setItem(this.SORT_KEY, this.sortBy);
+    } catch (_) {
+      // localStorage no disponible (privado/bloqueado): el criterio sigue
+      // funcionando en esta sesión, solo no se recuerda entre sesiones.
+    }
+  },
+
   renderList(filter) {
     const container = document.getElementById("ore-list");
-    const entries = Object.entries(DATA.ores)
-      .filter(([, ore]) => ore.display_name.toLowerCase().includes(filter))
-      .sort((a, b) => a[1].display_name.localeCompare(b[1].display_name));
+    let entries = Object.entries(DATA.ores).filter(([, ore]) => ore.display_name.toLowerCase().includes(filter));
+
+    if (this.sortBy === "alpha") {
+      entries.sort((a, b) => a[1].display_name.localeCompare(b[1].display_name));
+    } else {
+      // Descendente por defecto en criterios numéricos (precio/rareza más
+      // alta primero); sin dato -> al final, empatando por nombre.
+      entries.sort((a, b) => {
+        const va = finderSortValue(a[0], this.sortBy);
+        const vb = finderSortValue(b[0], this.sortBy);
+        if (va == null && vb == null) return a[1].display_name.localeCompare(b[1].display_name);
+        if (va == null) return 1;
+        if (vb == null) return -1;
+        return vb - va;
+      });
+    }
 
     container.innerHTML = entries
       .map(([key, ore]) => {
-        const best = DATA.bestSellFor(key);
-        const price = best ? fmtNum(best.price) + " aUEC" : "";
         return `<div class="side-item ${key === this.selected ? "active" : ""}" data-ore="${key}">
           <span class="side-item-name">${rarityDotHtml(key)}${esc(ore.display_name)}</span>
-          <span class="sub">${price}</span>
+          <span class="sub">${this.subLabelFor(key)}</span>
         </div>`;
       })
       .join("");
@@ -69,6 +150,48 @@ const Finder = {
     container.querySelectorAll(".side-item").forEach((el) =>
       el.addEventListener("click", () => this.select(el.dataset.ore))
     );
+
+    this.updateSortHints();
+  },
+
+  // Texto de la derecha de cada fila: por defecto (orden alfabético) el
+  // mejor precio de venta, igual que siempre; con un criterio de orden
+  // activo, el propio dato por el que se está ordenando — así el usuario
+  // puede comprobar a ojo que el orden es correcto sin abrir cada ficha.
+  subLabelFor(oreKey) {
+    if (this.sortBy === "refined") {
+      const c = DATA.uexRefinedFor(oreKey);
+      if (c && c.price_sell > 0) return `${fmtNum(c.price_sell)} aUEC (refinado)`;
+      return DATA.uexReady ? "sin refinado" : "cargando…";
+    }
+    if (this.sortBy === "p2p") {
+      const rows = DATA.marketplaceAvgFor(oreKey).filter((r) => r.unit === "scu");
+      if (rows.length) return `${fmtNum(Math.max(...rows.map((r) => r.priceAvg)))} aUEC (P2P)`;
+      return DATA.marketplaceReady ? "sin datos P2P" : "cargando…";
+    }
+    if (this.sortBy === "rarity") {
+      const r = DATA.rarityFor(oreKey);
+      return r ? r.label : "sin rareza";
+    }
+    const best = DATA.bestSellFor(oreKey);
+    return best ? fmtNum(best.price) + " aUEC" : "";
+  },
+
+  // Los dos criterios de precio dependen de datos en vivo que llegan
+  // DESPUÉS del primer render (DATA.uexReady/marketplaceReady, ver
+  // app.js): mientras no están listos, todas las filas valen null y el
+  // orden cae al empate alfabético — no rompe, simplemente no reordena
+  // "de verdad" hasta que rerenderLiveViews() vuelva a llamar a
+  // renderList() con los datos ya cargados. Aquí solo se avisa en el
+  // <select> con "(cargando…)" mientras tanto.
+  updateSortHints() {
+    const sel = document.getElementById("ore-sort");
+    if (!sel) return;
+    sel.value = this.sortBy;
+    const refinedOpt = sel.querySelector('option[value="refined"]');
+    const p2pOpt = sel.querySelector('option[value="p2p"]');
+    if (refinedOpt) refinedOpt.textContent = FINDER_SORT_LABELS.refined + (DATA.uexReady ? "" : " (cargando…)");
+    if (p2pOpt) p2pOpt.textContent = FINDER_SORT_LABELS.p2p + (DATA.marketplaceReady ? "" : " (cargando…)");
   },
 
   select(oreKey) {

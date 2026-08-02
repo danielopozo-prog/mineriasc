@@ -4,6 +4,8 @@
 const Locations = {
   system: "todos",
   selected: null,
+  sortBy: "alpha",
+  SORT_KEY: "mineriasc_locations_sort",
 
   init() {
     const systems = DATA.systems();
@@ -20,20 +22,59 @@ const Locations = {
         this.renderList();
       })
     );
+
+    this.sortBy = this.loadSort();
+    const sortSel = document.getElementById("loc-sort");
+    sortSel.value = this.sortBy;
+    sortSel.addEventListener("change", () => {
+      this.sortBy = sortSel.value;
+      this.saveSort();
+      this.renderList();
+    });
+
     this.renderList();
+  },
+
+  loadSort() {
+    try {
+      const v = localStorage.getItem(this.SORT_KEY);
+      return v === "ores" ? v : "alpha";
+    } catch (_) {
+      return "alpha";
+    }
+  },
+
+  saveSort() {
+    try {
+      localStorage.setItem(this.SORT_KEY, this.sortBy);
+    } catch (_) {
+      // sin localStorage disponible: el criterio sigue activo esta sesión
+    }
+  },
+
+  // Nº de minerales identificados en una ubicación — 100% local
+  // (location_ores de mining_data.json), disponible siempre, por eso no
+  // hace falta gestionar un estado "sin dato" como en Finder (precios UEX).
+  oreCountFor(loc) {
+    return new Set(Object.values(loc.ores || {}).flat().map((e) => e.ore)).size;
   },
 
   renderList() {
     const container = document.getElementById("loc-list");
-    const entries = Object.entries(DATA.locationOres)
-      .filter(([, loc]) => this.system === "todos" || loc.system === this.system)
-      .sort((a, b) => a[1].name.localeCompare(b[1].name));
+    const entries = Object.entries(DATA.locationOres).filter(
+      ([, loc]) => this.system === "todos" || loc.system === this.system
+    );
+
+    if (this.sortBy === "ores") {
+      // Descendente por defecto (más minerales primero); empate por nombre.
+      entries.sort((a, b) => this.oreCountFor(b[1]) - this.oreCountFor(a[1]) || a[1].name.localeCompare(b[1].name));
+    } else {
+      entries.sort((a, b) => a[1].name.localeCompare(b[1].name));
+    }
 
     container.innerHTML = entries
       .map(([key, loc]) => {
-        const nOres = new Set(
-          Object.values(loc.ores || {}).flat().map((e) => e.ore)
-        ).size;
+        const nOres = this.oreCountFor(loc);
         return `<div class="side-item ${key === this.selected ? "active" : ""}" data-loc="${key}">
           <span>${esc(loc.name)}</span>
           <span class="sub">${esc(loc.system)} · ${nOres} minerales</span>

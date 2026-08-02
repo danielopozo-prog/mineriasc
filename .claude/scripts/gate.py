@@ -199,6 +199,35 @@ def main():
         check("craft_blueprints.json: categorias de primer nivel conocidas (revisar CRAFT_SECTION_ES si cambian)",
               top_cats <= known_top_cats, f"nuevas: {sorted(top_cats - known_top_cats)}")
 
+    # --- ordenacion de listas (Buscador/Ubicaciones/Crafteo) -------------
+    # Cada criterio numerico manda los minerales/materiales sin dato al
+    # final (nunca se inventa un valor) y persiste en localStorage bajo una
+    # clave mineriasc_* (convencion del proyecto, ver CLAUDE.md).
+    finder_js_src = (ROOT / "js" / "finder.js").read_text(encoding="utf-8")
+    check("finder.js: finderSortValue definido (criterios de orden)", "function finderSortValue" in finder_js_src)
+    check("finder.js: criterio 'refined' usa DATA.uexRefinedFor", "DATA.uexRefinedFor(oreKey)" in finder_js_src)
+    check("finder.js: criterio 'p2p' usa DATA.marketplaceAvgFor filtrando unit==='scu' (no mezcla unidades)",
+          re.search(r"criterion === \"p2p\"[\s\S]{0,200}unit === \"scu\"", finder_js_src) is not None)
+    check("finder.js: criterio 'rarity' usa RARITY_ORDER", "RARITY_ORDER[r.tier]" in finder_js_src)
+    check("finder.js: valores sin dato van al final del orden (nunca se inventan)",
+          re.search(r"if \(va == null\) return 1", finder_js_src) is not None)
+    check("finder.js: persiste el criterio en localStorage bajo clave mineriasc_*",
+          'SORT_KEY: "mineriasc_finder_sort"' in finder_js_src)
+    check("finder.js: degrada mientras UEX/marketplace no cargan (sin romper, reordena al llegar)",
+          "DATA.uexReady" in finder_js_src and "DATA.marketplaceReady" in finder_js_src)
+
+    locations_js_src = (ROOT / "js" / "locations.js").read_text(encoding="utf-8")
+    check("locations.js: persiste el criterio de orden en localStorage bajo clave mineriasc_*",
+          'SORT_KEY: "mineriasc_locations_sort"' in locations_js_src)
+
+    check("crafting.js: persiste el orden del selector de material en localStorage bajo clave mineriasc_*",
+          'MATERIAL_SORT_KEY: "mineriasc_crafting_sort"' in craft_view_src)
+    check("crafting.js: craftMaterialRarity usa DATA.oreKeyForCraftMaterial (resolutor inverso expuesto por datos-uex)",
+          re.search(r"function craftMaterialRarity\(rawName\)\s*\{[\s\S]{0,120}DATA\.oreKeyForCraftMaterial\(rawName\)",
+                     craft_view_src) is not None)
+    check("crafting.js: orden 'count' es descendente por defecto (mas objetos primero)",
+          re.search(r"materialSort === \"count\"[\s\S]{0,200}b\.count - a\.count", craft_view_src) is not None)
+
     # --- multipagina: cada pagina de nivel superior ("hoja" de una app) se
     # valida por separado (scripts, ids), pero js/ y el gate global siguen
     # siendo uno solo. Anadir una pagina nueva = anadirla a este dict.

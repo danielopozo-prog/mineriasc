@@ -102,6 +102,7 @@ const DATA = {
   uexLocations: [], // catálogo ampliado (ciudades/estaciones/outposts) de data/uex_locations.json
   craft: { blueprints: [], byMaterial: {}, ready: false }, // data/craft_blueprints.json + índice material -> planos
   _refreshInFlight: null, // promesa del refreshLive() en curso, para deduplicar clicks
+  _craftMaterialToOreKey: {}, // nombre de material sc-craft.tools (normalizado) -> clave de `ores`; ver oreKeyForCraftMaterial()
 
   async load() {
     const res = await fetch("data/mining_data.json");
@@ -179,6 +180,21 @@ const DATA = {
       if (sig.ore_hint && RARITY_TIERS_VALID.has(sig.tier)) {
         this.oreRarity[sig.ore_hint] = sig.tier;
       }
+    }
+
+    // Nombre de material sc-craft.tools (normalizado con craftBaseName) ->
+    // clave de `ores`: índice inverso al que ya hace craftByMaterial en
+    // sentido ore->nombre (CRAFT_NAME_OVERRIDES[clave] || display_name).
+    // Depende solo de `this.ores` (ya asignado antes de llamar a
+    // buildIndexes(), ver load()), no de `craft.blueprints` — por eso vive
+    // aquí y no en buildCraftIndex(), y está listo aunque
+    // data/craft_blueprints.json aún no haya cargado o falte. Usado por
+    // oreKeyForCraftMaterial().
+    this._craftMaterialToOreKey = {};
+    for (const [oreKey, ore] of Object.entries(this.ores)) {
+      const rawName = CRAFT_NAME_OVERRIDES[oreKey] || ore.display_name || oreKey;
+      const norm = craftBaseName(rawName);
+      if (norm) this._craftMaterialToOreKey[norm] = oreKey;
     }
   },
 
@@ -323,6 +339,24 @@ const DATA = {
       ? CRAFT_NAME_OVERRIDES[oreKeyOrName] || ore.display_name || oreKeyOrName
       : oreKeyOrName;
     return this.craft.byMaterial[craftBaseName(rawName)] || [];
+  },
+
+  // Inverso de la resolución ore->nombre-de-material que usa craftByMaterial:
+  // dado `rawName` tal como aparece en `ingredients[].name` de
+  // data/craft_blueprints.json (p.ej. "Aluminum", "Quantainium", "Iron"),
+  // devuelve la clave de `DATA.ores` que representa ese mineral (p.ej.
+  // "ALUMINUM", "QUANTANIUM", "IRON") — para que quien consulte un
+  // ingrediente pueda cruzarlo con `DATA.ores`/`DATA.oreRarity`/etc. sin
+  // reimplementar la normalización ni duplicar CRAFT_NAME_OVERRIDES.
+  // Usa el índice `_craftMaterialToOreKey` construido en buildIndexes()
+  // (disponible tras `await DATA.load()`, no depende de que
+  // data/craft_blueprints.json haya cargado). Devuelve null si `rawName` no
+  // corresponde a ningún mineral de mining_data.json — caso real: sc-craft.tools
+  // trae "Pressurized Ice" como ingrediente, que NO es el `ICE` de minería
+  // (ver comentario de craftByMaterial) y no tiene entrada en `ores`.
+  oreKeyForCraftMaterial(rawName) {
+    const norm = craftBaseName(rawName);
+    return (norm && this._craftMaterialToOreKey[norm]) || null;
   },
 
   // Medias del Marketplace P2P (jugador-a-jugador): se cargan aparte, igual que

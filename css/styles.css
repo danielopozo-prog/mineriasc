@@ -168,6 +168,12 @@ main { flex: 1; padding: 20px 24px; max-width: 1600px; width: 100%; margin: 0 au
   margin-bottom: 16px;
 }
 .head-title { display: flex; flex-direction: column; gap: 2px; }
+/* Búsqueda/filtro + control de ordenación agrupados a la derecha del
+   panel-head (Buscador, Ubicaciones, Crafteo): mismo flex-wrap que el propio
+   panel-head, así que en pantallas estrechas el select de orden simplemente
+   baja de línea en vez de desbordar. */
+.panel-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.panel-head-actions select { min-width: 0; }
 .panel-head h2 {
   font-family: var(--font-display);
   font-size: 1.5rem;

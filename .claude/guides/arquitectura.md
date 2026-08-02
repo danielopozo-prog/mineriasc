@@ -66,8 +66,40 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
 - Cada vista es un objeto literal con `init()` / `render*()`; estado en propiedades
   (`selected`, `groupBy`…). Sin clases, sin módulos ES.
 - Claves de `localStorage`: `mineriasc_inventory` (inventario), `mineriasc_uex_*`
-  (caché de la API con timestamp) y `mineriasc_favorites` (array de claves de
-  mineral marcadas como favoritas en la pestaña Señales).
+  (caché de la API con timestamp), `mineriasc_favorites` (array de claves de
+  mineral marcadas como favoritas en la pestaña Señales), y el criterio de orden
+  de cada lista ordenable (ver más abajo): `mineriasc_finder_sort`,
+  `mineriasc_locations_sort`, `mineriasc_crafting_sort`.
+- **Listas ordenables** (Buscador, Ubicaciones, Crafteo): un `<select>` pequeño
+  (≤5 opciones, nunca envuelto con `SearchSelect`) junto al buscador/filtro de
+  cada pestaña, dentro de un contenedor `.panel-head-actions`. Mismo patrón en
+  las tres vistas — estado `sortBy`/`SORT_KEY`, `loadSort()`/`saveSort()`
+  (try/catch por si `localStorage` no está disponible, igual que el resto de
+  la app) y el `<select>`.value ya sirve de indicador del criterio activo, sin
+  marcado extra. Criterios numéricos: descendente por defecto, valores sin
+  dato SIEMPRE van al final (nunca se inventan) empatando por nombre. Cuando
+  el criterio depende de datos en vivo (Buscador: precio refinado/P2P, solo
+  disponibles tras `DATA.uexReady`/`DATA.marketplaceReady`), el propio
+  `<option>` se marca "(cargando…)" mientras tanto y el orden cae al empate
+  alfabético sin romper — se recalcula solo cuando `app.js` vuelve a llamar a
+  `renderList()` tras `loadUexPrices()`/`loadMarketplaceAverages()`.
+  `js/crafting.js` reordena las `<option>` del propio `#craft-material-select`
+  (un `SearchSelect`) en vez de añadir una API nueva a `js/searchselect.js`:
+  reasignar `sel.innerHTML` + restaurar `sel.value` + `sel._sselApi.sync()`
+  basta, porque el `MutationObserver` interno de `SearchSelect` ya refresca el
+  panel de opciones solo si estaba abierto. El criterio "rareza" de Crafteo
+  (`craftMaterialRarity`) resuelve el material al mineral de `DATA.ores` vía
+  `DATA.oreKeyForCraftMaterial(rawName)` — resolutor INVERSO de la
+  normalización que ya usa `craftByMaterial` (`CRAFT_NAME_OVERRIDES` +
+  `craftBaseName`), expuesto por datos-uex a petición de esta vista (antes
+  `crafting.js` reimplementaba un match exacto de `display_name` que solo
+  cubría 34 de 36 materiales; ver contrato en `.claude/guides/datos-juego.md`).
+  Cubre los 36 materiales reales del parche actual, incluidos Aluminum/
+  Quantainium (grafía distinta a mining_data.json). Solo queda sin rareza
+  "Pressurized Ice" (no es el `ICE` de minería, no tiene entrada en `ores` —
+  caso real, no un hueco de cobertura) y cualquier mineral sin tier fiable en
+  `mining_data.json` (`DATA.rarityFor` ya devuelve `null` en ese caso); ambos
+  van al final del orden, igual que el resto de "sin dato".
 - Los listados laterales (`.side-item`) se regeneran enteros en cada render y
   re-atachan sus listeners; no hay delegación de eventos.
 - Pestaña Señales (`js/signals.js`): además de la tabla de múltiplos por

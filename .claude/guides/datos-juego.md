@@ -196,3 +196,14 @@ python .claude/scripts/fetch_craft_blueprints.py
     `CRAFT_NAME_OVERRIDES`/`display_name`, igual patrón que `uexFor` — o un
     nombre de material libre normalizado igual. `[]` si no hay ningún plano
     (nunca `null`).
+  - `DATA.oreKeyForCraftMaterial(rawName)` → clave de `DATA.ores` (p.ej.
+    `"ALUMINUM"`, `"QUANTANIUM"`, `"IRON"`) o `null`. Es el inverso de la
+    resolución anterior: dado `rawName` tal como aparece en
+    `ingredients[].name` (grafía de sc-craft.tools), la cruza contra
+    `CRAFT_NAME_OVERRIDES`/`display_name` de cada mineral (vía un índice
+    `_craftMaterialToOreKey` reconstruido en `buildIndexes()`, sin duplicar la
+    tabla de overrides) y devuelve la clave de `ores` correspondiente. `null`
+    para materiales que no son minerales de `mining_data.json` — caso real:
+    `"Pressurized Ice"`. Disponible tras `await DATA.load()`, no depende de
+    que `data/craft_blueprints.json` haya cargado (el índice se construye a
+    partir de `ores`, no de los planos).
