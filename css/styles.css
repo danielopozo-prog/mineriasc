@@ -593,6 +593,35 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
 }
 .craft-credit { text-align: right; margin-top: 10px; }
 
+/* Cabecera de sección del acordeón a dos líneas — SOLO dentro de #craft-list
+   (Crafteo): scoping por ID a propósito para no tocar .side-group-head base,
+   que Señales sigue usando tal cual para "Favoritos"/"Todos" (una sola
+   línea), ni los acordeones .inv-box-head de Inventario. El caret sigue
+   centrado verticalmente sin CSS extra: .side-group-head ya es flex con
+   align-items:center, así que se centra solo respecto al bloque de 2 líneas. */
+#craft-list .craft-section-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+#craft-list .craft-section-name {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+}
+#craft-list .craft-section-count {
+  font-family: var(--font-ui);
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--accent-2);
+}
+
 /* Chips de filtro (peso/pieza de armadura, tipo de arma) — mismo patrón
    visual que .sig-loc-method-filter de Señales (pastilla apagada hasta que
    se activa, varias a la vez vía Set, reutilizado en vez de inventar otro

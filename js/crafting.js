@@ -428,8 +428,15 @@ const Crafting = {
     listEl.innerHTML = orderedSections
       .map((sec) => {
         const open = this.openSections.has(sec.key);
+        // Cabecera a dos líneas (nombre arriba, contador abajo) — SOLO en
+        // Crafteo: el estilo vive en css/styles.css bajo el selector
+        // "#craft-list .side-group-head ...", que no toca la regla base de
+        // .side-group-head (Señales sigue viendo su cabecera de una línea).
         const head = `<button type="button" class="side-group-head" data-sec="${esc(sec.key)}" aria-expanded="${open}">
-          <span>${esc(sec.label)} · ${sec.rows.length} objeto${sec.rows.length === 1 ? "" : "s"}</span>
+          <span class="craft-section-text">
+            <span class="craft-section-name">${esc(sec.label)}</span>
+            <span class="craft-section-count">${sec.rows.length} objeto${sec.rows.length === 1 ? "" : "s"}</span>
+          </span>
           <span class="side-group-caret">${open ? "▾" : "▸"}</span>
         </button>`;
         const rows = sec.rows
