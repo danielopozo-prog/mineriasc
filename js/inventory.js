@@ -87,6 +87,16 @@ const Inventory = {
         )
         .join("");
 
+    // Combos con buscador: mineral (100+ opciones) y ubicación (237, con
+    // optgroups por sistema) los necesitan de sobra; categoría tiene 6
+    // (justo por encima del umbral de 5 en el que un <select> nativo sigue
+    // siendo lo más simple). El <select> original sigue siendo la fuente de
+    // verdad (ver js/searchselect.js) — todo lo de abajo (updateEntryTypeUI,
+    // add()) sigue leyendo/escribiendo sobre él sin cambios.
+    SearchSelect.enhance(oreSel, { placeholder: "Buscar mineral…" });
+    SearchSelect.enhance(catSel, { placeholder: "Buscar categoría…" });
+    SearchSelect.enhance(locSel, { placeholder: "Buscar ubicación…" });
+
     document.getElementById("inv-entry-type").addEventListener("change", () => this.updateEntryTypeUI());
     document.getElementById("inv-category").addEventListener("change", () => this.updateEntryTypeUI());
     this.updateEntryTypeUI();

@@ -8,6 +8,7 @@ servidor estático (`python -m http.server 8123`); `fetch` impide abrirlo con do
 ```
 js/uex.js        → objeto UEX (cliente API, sin dependencias)
 js/data.js       → objeto DATA (carga JSON, índices) + utilidades globales
+js/searchselect.js → objeto SearchSelect (combo con buscador, ver más abajo)
 js/finder.js     → objeto Finder (pestaña Buscador)
 js/locations.js  → objeto Locations (pestaña Ubicaciones)
 js/refinery.js   → objeto Refinery (pestaña Refinería, render perezoso)
@@ -84,6 +85,42 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
     selección): persisten en `mineriasc_favorites`, se listan agrupados
     bajo "Favoritos" arriba de la lista lateral, y se priorizan (antes que
     la cercanía) al ordenar los resultados de la búsqueda inversa.
+
+## Combo con buscador (`js/searchselect.js`)
+
+`SearchSelect.enhance(select, {placeholder})` envuelve un `<select>` de 6+
+opciones en un desplegable con un cuadro de texto que filtra en vivo
+(insensible a mayúsculas/acentos vía `normalize("NFD")` +
+`replace(/[\u0300-\u036f]/g, "")`). Se usa en Inventario (`#inv-ore`,
+`#inv-category`, `#inv-loc`) y en Señales (`#sig-loc-select`); selects de ≤5
+opciones (p. ej. `#inv-entry-type`) se quedan como `<select>` nativo — el
+criterio de cuándo envolver uno lo decide quien llama a `enhance()`, no el
+módulo.
+
+Diseño clave: el `<select>` original **nunca se quita del DOM** — se mueve
+dentro de un `<div class="ssel">`, queda invisible (`opacity: 0`) pero
+superpuesto exactamente al botón visible (`.ssel-trigger`, mismo `inset: 0`),
+y sigue siendo la única fuente de verdad (`value`, `required`, `disabled`,
+`hidden`). Elegir una opción del panel hace `select.value = ...` y dispara un
+evento `"change"` nativo sobre él, así que ningún módulo que ya escuchaba
+`change` o leía `.value` con `getElementById` tuvo que cambiar. Dos huecos a
+tener en cuenta si se reutiliza en una vista nueva:
+
+- Si algo asigna `select.value` **por código** (no por click del usuario) —
+  como `Signals.clearLocation()` — hay que llamar después a
+  `select._sselApi.sync()`: asignar `.value` no dispara `change`, así que la
+  etiqueta del botón no se actualiza sola.
+- Un `MutationObserver` interno vigila `hidden`/`disabled`/`required` y los
+  hijos (`<option>`/`<optgroup>`) del `<select>` original, así que código que
+  alterna `oreSel.hidden = ...` (como `Inventory.updateEntryTypeUI()`) sigue
+  funcionando sin llamar a nada del combo explícitamente.
+
+CSS en `css/styles.css` bajo `/* Combo con buscador */`: incluye
+`.ssel[hidden] { display: none; }` porque una regla de autor con `[hidden]`
+gana siempre a la hoja de estilos del user-agent (mismo motivo que
+`.split[hidden]`/`.inv-box-body[hidden]`, comentado más arriba en el propio
+CSS) y `.ssel-panel .ssel-search` con especificidad reforzada para no perder
+frente a `.inv-form input`.
 
 ## Página hermana: `contadores.html`
 

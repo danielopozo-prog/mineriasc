@@ -120,6 +120,12 @@ const Signals = {
 
     sel.addEventListener("change", () => this.selectLocation(sel.value));
     document.getElementById("sig-loc-back").addEventListener("click", () => this.clearLocation());
+
+    // Combo con buscador: decenas de ubicaciones de minado agrupadas por
+    // sistema (ver js/searchselect.js). sel sigue siendo la fuente de
+    // verdad — clearLocation() de abajo llama a .sync() porque asignar
+    // sel.value directamente no dispara "change".
+    SearchSelect.enhance(sel, { placeholder: "Buscar ubicación…" });
   },
 
   // Minerales presentes en una ubicación, con su método de minado (fps/
@@ -186,7 +192,9 @@ const Signals = {
   },
 
   clearLocation() {
-    document.getElementById("sig-loc-select").value = "";
+    const sel = document.getElementById("sig-loc-select");
+    sel.value = "";
+    sel._sselApi?.sync(); // asignar .value no dispara "change": refresca la etiqueta del combo
     this.selectLocation(null);
   },
 

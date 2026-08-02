@@ -190,6 +190,105 @@ input[type="search"], input[type="number"], select {
 }
 input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
 
+/* ---------- Combo con buscador (js/searchselect.js) ----------
+   Envuelve un <select> largo (6+ opciones): el <select> original queda
+   dentro, invisible pero superpuesto exactamente al botón visible
+   (.ssel-trigger) para que la burbuja nativa de validación "required" del
+   navegador, si aparece, señale al sitio correcto. */
+.ssel { position: relative; display: inline-flex; flex: 1; min-width: 220px; }
+.ssel[hidden] { display: none; } /* una regla de autor con [hidden] siempre gana al display del selector de tipo select de arriba */
+.ssel-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.ssel-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border-muted);
+  color: var(--text);
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: left;
+}
+.ssel-trigger:hover { border-color: var(--border-strong); }
+.ssel.open .ssel-trigger, .ssel-trigger:focus-visible {
+  outline: 1px solid var(--accent);
+  border-color: var(--accent);
+}
+.ssel.disabled .ssel-trigger { opacity: 0.5; cursor: not-allowed; }
+.ssel-trigger-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ssel-trigger-label.placeholder { color: var(--text-dim); }
+.ssel-caret { color: var(--text-dim); font-size: 0.75rem; flex-shrink: 0; }
+
+.ssel-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  padding: 8px;
+}
+.ssel-panel .ssel-search {
+  /* Especificidad reforzada (0,2,0) a propósito: gana a ".inv-form input"
+     (0,1,1), que si no forzaría flex/min-width del formulario sobre el
+     buscador del panel — ver .inv-form select, .inv-form input más abajo. */
+  flex: none;
+  width: 100%;
+  min-width: 0;
+  background: var(--bg-alt);
+  border: 1px solid var(--border-muted);
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+.ssel-search:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.ssel-options { overflow-y: auto; }
+.ssel-group-label {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent-2);
+  padding: 6px 8px 2px;
+}
+.ssel-option {
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+}
+.ssel-option:hover, .ssel-option.highlight { background: var(--panel-hover); }
+.ssel-option.selected { background: var(--accent-soft); color: var(--accent); }
+.ssel-empty { padding: 10px; color: var(--text-dim); font-size: 0.85rem; text-align: center; }
+
+.inv-form .ssel { flex: 1; min-width: 160px; }
+.sig-loc-mode-row .ssel { min-width: 260px; }
+
 .split {
   display: grid;
   grid-template-columns: 280px 1fr;
