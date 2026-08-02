@@ -127,6 +127,68 @@ function craftSectionLabel(key) {
   return CRAFT_SECTION_ES[key] || key.split("/").join(" · ");
 }
 
+/* ---------- Filtros por chips (peso/pieza de armadura, tipo de arma) ----------
+   Al estilo de los filtros de sc-craft.tools. Verificado contra los 1589
+   planos del parche actual (no una muestra): */
+
+// Peso de armadura: 3er nivel de category, SOLO cuando el 1º es "Armour" —
+// verificado que en TODO el catálogo el 3er nivel de Armour es siempre uno
+// de estos 3 valores exactos (Light/Medium/Heavy), nunca otra cosa, así que
+// no hace falta más heurística que leer la posición y comprobar que es un
+// valor conocido (si algún día no lo fuera, se descarta en vez de mostrar
+// un peso inventado).
+const CRAFT_ARMOR_WEIGHT_ES = { Light: "Ligera", Medium: "Media", Heavy: "Pesada" };
+const CRAFT_ARMOR_WEIGHT_ORDER = ["Light", "Medium", "Heavy"];
+
+function craftArmorWeight(category) {
+  const parts = craftCategoryParts(category);
+  if (parts[0] !== "Armour") return null;
+  return CRAFT_ARMOR_WEIGHT_ES[parts[2]] ? parts[2] : null;
+}
+
+// Pieza de armadura: la propia `category` NO trae la pieza (casco/torso/
+// brazos/piernas) — solo rol + peso. La pieza va en el NOMBRE del objeto
+// (p.ej. "Antium Helmet", "ADP Core Blue", "ADP-mk4 Arms Woodland"). Heurística
+// verificada uno a uno contra los 915 nombres de planos de Armour del parche
+// actual (python -c sobre data/craft_blueprints.json): buscar como palabra
+// suelta (\b, insensible a mayúsculas) cada una de las 4 piezas pedidas por
+// el encargo cubre 898 de 915 (98%) SIN ningún caso de nombre que contenga
+// dos piezas a la vez. Los 17 restantes son trajes completos ("... Suit",
+// "... Armor") o ropa civil que no se reparte en las 4 piezas (Jacket/Shirt/
+// Trousers/Shoes) — quedan sin pieza y no se filtran por este grupo, tal
+// como pide el encargo. "Backpack" (25) y "Undersuit" (13) tampoco entran
+// aposta: no son ninguna de las 4 piezas pedidas.
+const CRAFT_ARMOR_PIECE_ES = { Helmet: "Casco", Core: "Torso", Arms: "Brazos", Legs: "Piernas" };
+const CRAFT_ARMOR_PIECE_ORDER = ["Helmet", "Core", "Arms", "Legs"];
+
+function craftArmorPiece(category, name) {
+  if (craftCategoryParts(category)[0] !== "Armour") return null;
+  for (const key of CRAFT_ARMOR_PIECE_ORDER) {
+    if (new RegExp(`\\b${key}\\b`, "i").test(name || "")) return key;
+  }
+  return null;
+}
+
+// Tipo de arma: 2º nivel de category, solo cuando el 1º es "Weapons".
+// Verificado: los únicos 6 valores reales del parche actual son estos —
+// SMG/LMG se dejan tal cual (sigla ya asentada en la comunidad hispana de
+// Star Citizen, "traducirla" a una expansión larga sería menos reconocible).
+const CRAFT_WEAPON_TYPE_ES = {
+  Pistol: "Pistola",
+  Rifle: "Rifle",
+  Sniper: "Francotirador",
+  SMG: "SMG",
+  Shotgun: "Escopeta",
+  LMG: "LMG",
+};
+const CRAFT_WEAPON_TYPE_ORDER = ["Pistol", "Rifle", "SMG", "LMG", "Shotgun", "Sniper"];
+
+function craftWeaponType(category) {
+  const parts = craftCategoryParts(category);
+  if (parts[0] !== "Weapons") return null;
+  return CRAFT_WEAPON_TYPE_ES[parts[1]] ? parts[1] : null;
+}
+
 const Crafting = {
   selectedMaterial: null, // rawName tal cual aparece en ingredients[].name, o null
   selectedBlueprintId: null,
@@ -136,6 +198,11 @@ const Crafting = {
   // craftSectionKey(). Todas plegadas por defecto; se vacía por completo al
   // cambiar de material (selectMaterial), nunca se conserva entre materiales.
   openSections: new Set(),
+  // Filtros por chips activos (multi-selección, combinables ENTRE grupos —
+  // dentro de un mismo grupo es un OR: "Ligera" + "Media" = cualquiera de
+  // las dos; entre grupos es un AND: "Pesada" + "Casco" = solo cascos
+  // pesados). Se vacían por completo al cambiar de material.
+  filters: { weight: new Set(), piece: new Set(), weaponType: new Set() },
 
   init() {
     if (!DATA.craft.ready) {
@@ -151,6 +218,7 @@ const Crafting = {
     SearchSelect.enhance(sel, { placeholder: "Buscar material…" });
     sel.addEventListener("change", () => this.selectMaterial(sel.value));
 
+    this.renderFilters();
     this.renderList();
   },
 
@@ -196,7 +264,18 @@ const Crafting = {
     for (const { blueprint, ingredient } of DATA.craftByMaterial(rawName)) {
       let g = byBp.get(blueprint.id);
       if (!g) {
-        g = { blueprint, qty: 0, unit: ingredient.unit, mixedUnit: false };
+        g = {
+          blueprint,
+          qty: 0,
+          unit: ingredient.unit,
+          mixedUnit: false,
+          // Etiquetas para los chips de filtro (ver craftArmorWeight/
+          // craftArmorPiece/craftWeaponType arriba) — se calculan una vez
+          // aquí, no en cada render.
+          weight: craftArmorWeight(blueprint.category),
+          piece: craftArmorPiece(blueprint.category, blueprint.name),
+          weaponType: craftWeaponType(blueprint.category),
+        };
         byBp.set(blueprint.id, g);
       }
       if (g.unit !== ingredient.unit) g.mixedUnit = true;
@@ -204,7 +283,9 @@ const Crafting = {
     }
     this.items = [...byBp.values()].sort((a, b) => a.qty - b.qty);
     this.openSections = new Set(); // todas plegadas al cambiar de material
+    this.filters = { weight: new Set(), piece: new Set(), weaponType: new Set() }; // filtros a cero
 
+    this.renderFilters();
     this.renderList();
     document.getElementById("craft-detail").innerHTML =
       '<p class="placeholder">Selecciona un objeto de la lista para ver su ficha de fabricación.</p>';
@@ -214,6 +295,79 @@ const Crafting = {
     if (this.openSections.has(key)) this.openSections.delete(key);
     else this.openSections.add(key);
     this.renderList();
+  },
+
+  toggleFilter(group, value) {
+    const set = this.filters[group];
+    if (!set) return;
+    if (set.has(value)) set.delete(value);
+    else set.add(value);
+    this.renderFilters();
+    this.renderList();
+  },
+
+  clearFilters() {
+    this.filters = { weight: new Set(), piece: new Set(), weaponType: new Set() };
+    this.renderFilters();
+    this.renderList();
+  },
+
+  // Barra de chips encima de la lista: solo se muestran los grupos (y solo
+  // los valores DENTRO de cada grupo) que de verdad aparecen entre los
+  // objetos de este material — si el material no craftea armaduras, no hay
+  // chips de peso/pieza; si no craftea armas, no hay chips de tipo de arma.
+  // Las opciones de cada grupo se calculan sobre this.items (SIN filtrar) a
+  // propósito, para que no desaparezcan chips mientras el usuario los usa.
+  renderFilters() {
+    const box = document.getElementById("craft-filters");
+    const weights = new Set(this.items.map((r) => r.weight).filter(Boolean));
+    const pieces = new Set(this.items.map((r) => r.piece).filter(Boolean));
+    const types = new Set(this.items.map((r) => r.weaponType).filter(Boolean));
+
+    if (!weights.size && !pieces.size && !types.size) {
+      box.hidden = true;
+      box.innerHTML = "";
+      return;
+    }
+    box.hidden = false;
+
+    const chipGroup = (group, label, order, present, dict) => {
+      const values = order.filter((v) => present.has(v));
+      if (!values.length) return "";
+      const chips = values
+        .map((v) => {
+          const active = this.filters[group].has(v);
+          return `<button type="button" class="craft-filter-chip ${active ? "active" : ""}" data-group="${group}" data-value="${esc(v)}">${esc(dict[v] || v)}</button>`;
+        })
+        .join("");
+      return `<div class="craft-filter-group"><span class="craft-filter-label">${esc(label)}</span>${chips}</div>`;
+    };
+
+    const anyActive = this.filters.weight.size || this.filters.piece.size || this.filters.weaponType.size;
+
+    box.innerHTML =
+      chipGroup("weight", "Peso", CRAFT_ARMOR_WEIGHT_ORDER, weights, CRAFT_ARMOR_WEIGHT_ES) +
+      chipGroup("piece", "Pieza", CRAFT_ARMOR_PIECE_ORDER, pieces, CRAFT_ARMOR_PIECE_ES) +
+      chipGroup("weaponType", "Tipo de arma", CRAFT_WEAPON_TYPE_ORDER, types, CRAFT_WEAPON_TYPE_ES) +
+      (anyActive ? `<button type="button" id="craft-filters-clear" class="btn small">Limpiar filtros</button>` : "");
+
+    box.querySelectorAll(".craft-filter-chip").forEach((btn) =>
+      btn.addEventListener("click", () => this.toggleFilter(btn.dataset.group, btn.dataset.value))
+    );
+    const clearBtn = document.getElementById("craft-filters-clear");
+    if (clearBtn) clearBtn.addEventListener("click", () => this.clearFilters());
+  },
+
+  // ¿Pasa `row` los filtros activos? Un grupo vacío (ningún chip marcado) no
+  // restringe nada; un grupo con chips marcados exige que row tenga esa
+  // etiqueta Y que esté entre las marcadas (una fila sin esa etiqueta, p.ej.
+  // un arma cuando el filtro de peso de armadura está activo, queda fuera).
+  rowMatchesFilters(row) {
+    const f = this.filters;
+    if (f.weight.size && !(row.weight && f.weight.has(row.weight))) return false;
+    if (f.piece.size && !(row.piece && f.piece.has(row.piece))) return false;
+    if (f.weaponType.size && !(row.weaponType && f.weaponType.has(row.weaponType))) return false;
+    return true;
   },
 
   renderList() {
@@ -227,22 +381,32 @@ const Crafting = {
     }
 
     const materialLabel = this.selectedMaterial.replace(/\s*\(Ore\)\s*$/i, "").trim();
-    countHint.textContent = this.items.length
-      ? `${this.items.length} objeto${this.items.length === 1 ? "" : "s"} usan ${materialLabel}`
-      : `Ningún objeto registrado usa ${materialLabel}.`;
-
     if (!this.items.length) {
+      countHint.textContent = `Ningún objeto registrado usa ${materialLabel}.`;
       listEl.innerHTML = '<p class="placeholder">Sin resultados para este material.</p>';
       return;
     }
 
+    const filteredItems = this.items.filter((row) => this.rowMatchesFilters(row));
+    const anyFilterActive = this.filters.weight.size || this.filters.piece.size || this.filters.weaponType.size;
+    countHint.textContent = anyFilterActive
+      ? `${filteredItems.length} de ${this.items.length} objeto${this.items.length === 1 ? "" : "s"} usan ${materialLabel}`
+      : `${this.items.length} objeto${this.items.length === 1 ? "" : "s"} usan ${materialLabel}`;
+
+    if (!filteredItems.length) {
+      listEl.innerHTML = '<p class="placeholder">Ningún objeto coincide con los filtros seleccionados.</p>';
+      return;
+    }
+
     // Agrupar por sección de categoría (ver craftSectionKey/CRAFT_SECTION_ES
-    // arriba): el orden ascendente por cantidad de this.items se conserva
-    // DENTRO de cada sección (Map conserva orden de inserción). Las secciones
-    // se ordenan de más a menos objetos — la más relevante para este
-    // material primero — y a empate, alfabéticamente por su etiqueta.
+    // arriba), a partir de filteredItems: una sección sin objetos tras
+    // filtrar simplemente no aparece en el Map, así que desaparece sola. El
+    // orden ascendente por cantidad de this.items se conserva DENTRO de cada
+    // sección (Map conserva orden de inserción). Las secciones se ordenan de
+    // más a menos objetos — la más relevante para este material primero — y
+    // a empate, alfabéticamente por su etiqueta.
     const sections = new Map(); // key -> { label, rows: [] }
-    for (const row of this.items) {
+    for (const row of filteredItems) {
       const key = craftSectionKey(row.blueprint.category);
       let sec = sections.get(key);
       if (!sec) {
@@ -417,6 +581,7 @@ const Crafting = {
     sel.disabled = true;
     sel.innerHTML = '<option value="">Datos de crafteo no disponibles</option>';
     document.getElementById("craft-count-hint").textContent = "";
+    document.getElementById("craft-filters").hidden = true;
     document.getElementById("craft-list").innerHTML = "";
     document.getElementById("craft-detail").innerHTML =
       '<p class="placeholder">No se pudo cargar el catálogo de planos de crafteo ' +

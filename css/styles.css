@@ -593,6 +593,36 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
 }
 .craft-credit { text-align: right; margin-top: 10px; }
 
+/* Chips de filtro (peso/pieza de armadura, tipo de arma) — mismo patrón
+   visual que .sig-loc-method-filter de Señales (pastilla apagada hasta que
+   se activa, varias a la vez vía Set, reutilizado en vez de inventar otro
+   look), pero sin su código de color por método: aquí no hay una paleta de
+   3 colores fija por grupo, todos los grupos usan el mismo acento activo. */
+.craft-filters[hidden] { display: none; }
+.craft-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin-bottom: 12px;
+}
+.craft-filter-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.craft-filter-label { font-family: var(--font-ui); font-size: 0.75rem; color: var(--text-dim); }
+.craft-filter-chip {
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--panel);
+  border: 1px solid var(--border-muted);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.craft-filter-chip:hover { background: var(--panel-hover); }
+.craft-filter-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
 /* ---------- Buttons ---------- */
 .btn {
   display: inline-block;

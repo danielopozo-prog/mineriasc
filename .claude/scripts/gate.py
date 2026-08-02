@@ -172,8 +172,20 @@ def main():
         check("crafting.js: secciones plegables via <button> real (accesible con teclado, no div+onclick)",
               '<button type="button" class="side-group-head"' in craft_view_src)
         check("crafting.js: cambiar de material repliega todas las secciones (acordeon)",
-              re.search(r"selectMaterial\(rawName\)\s*\{[\s\S]{0,900}openSections\s*=\s*new Set\(\)", craft_view_src)
+              re.search(r"selectMaterial\(rawName\)\s*\{[\s\S]{0,1500}openSections\s*=\s*new Set\(\)", craft_view_src)
               is not None)
+        check("crafting.js: cambiar de material tambien pone los filtros a cero",
+              re.search(r"selectMaterial\(rawName\)\s*\{[\s\S]{0,1500}filters\s*=\s*\{\s*weight:\s*new Set\(\)",
+                         craft_view_src) is not None)
+        check("crafting.js: chips de filtro son <button> reales (accesibles con teclado, no div+onclick)",
+              'class="craft-filter-chip' in craft_view_src and "<button" in craft_view_src)
+        # La pieza de armadura (Helmet/Core/Arms/Legs) se busca en el NOMBRE del
+        # plano, no en category — sin este guard, un arma o componente de nave
+        # cuyo nombre contuviera por casualidad "Arms"/"Core" quedaria mal
+        # etiquetado como pieza de armadura y contaminaria el filtro "Pieza".
+        check("crafting.js: craftArmorPiece solo etiqueta objetos de categoria Armour",
+              re.search(r"function craftArmorPiece\(category, name\)\s*\{[\s\S]{0,120}!==\s*\"Armour\"",
+                         craft_view_src) is not None)
     app_js_src = (ROOT / "js" / "app.js").read_text(encoding="utf-8")
     check("app.js: Crafting.init() llamado", "Crafting.init()" in app_js_src)
     # Si sc-craft.tools reorganiza las categorias de primer nivel en un parche

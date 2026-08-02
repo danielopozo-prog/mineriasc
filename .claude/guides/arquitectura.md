@@ -158,6 +158,49 @@ más un selector de material arriba en vez de un buscador de texto libre):
    DISTINTOS, no filas de ingrediente (con Iron, por ejemplo, son 227
    objetos distintos pero 247 filas de ingrediente — la cifra correcta para
    "cuántos objetos" es la primera). Orden ascendente por cantidad.
+
+   La lista está agrupada en secciones por categoría (`craftSectionKey`/
+   `CRAFT_SECTION_ES`: nivel 1 de `category` para Weapons/Ammo, nivel 2 para
+   Armour/Vehiclegear — ver el comentario largo junto a `craftSectionKey` en
+   `js/crafting.js` para el porqué de la asimetría) y cada sección es un
+   **acordeón**: `<button class="side-group-head" aria-expanded>` con el
+   nombre y el contador SIEMPRE visibles, más un `<div class="side-group-body"
+   hidden>` con los `.side-item` — mismo patrón que las cajas de ubicación de
+   Inventario (`.inv-box-head`/`.inv-box-body`/`[hidden]`), reutilizado aquí
+   en vez de inventar otro. Plegadas por defecto (`Crafting.openSections`, un
+   `Set` de claves de sección, vacío al cambiar de material); varias pueden
+   estar abiertas a la vez.
+
+   Encima de la lista, **chips de filtro** (`#craft-filters`, mismo patrón
+   visual que `.sig-loc-method-filter` de Señales — pastilla apagada hasta
+   que se activa, varias a la vez vía `Set`, sin su código de color por
+   método porque aquí no hay una paleta fija de 3 colores por grupo) para
+   tres grupos, cada uno mostrado solo si tiene algún valor presente entre
+   los objetos del material elegido:
+   - **Peso** (Ligera/Media/Pesada): nivel 3 de `category`, solo si el nivel
+     1 es `"Armour"` — verificado que ese nivel 3 es SIEMPRE uno de esos 3
+     valores exactos en todo el catálogo (`craftArmorWeight`).
+   - **Pieza** (Casco/Torso/Brazos/Piernas): `category` no trae la pieza —
+     va en el NOMBRE del plano. `craftArmorPiece` busca como palabra suelta
+     (`\bHelmet\b`/`Core`/`Arms`/`Legs`, insensible a mayúsculas) en
+     `blueprint.name`, restringido a `category` con nivel 1 `"Armour"` (sin
+     ese guard, un arma o componente de nave cuyo nombre contuviera por
+     casualidad "Arms" quedaría mal etiquetado). Verificado contra los 915
+     nombres de Armour del parche actual: cubre 898 (98 %); los 17 restantes
+     (trajes completos, ropa civil) y los ítems "Backpack"/"Undersuit" (no
+     son ninguna de las 4 piezas pedidas) quedan sin pieza y no se filtran
+     por este grupo — comportamiento a propósito, no un hueco.
+   - **Tipo de arma** (Pistola/Rifle/SMG/LMG/Escopeta/Francotirador): nivel 2
+     de `category`, solo si el nivel 1 es `"Weapons"` — los 6 valores reales
+     verificados contra el catálogo completo (`craftWeaponType`).
+
+   Los filtros son combinables: dentro de un grupo es OR (Ligera + Media =
+   cualquiera de las dos), entre grupos es AND (Pesada + Casco = solo cascos
+   pesados) — `Crafting.rowMatchesFilters()`. Al filtrar, las secciones vacías
+   desaparecen solas (se agrupa sobre la lista ya filtrada) y el contador
+   pasa de `"N objetos usan X"` a `"N de M objetos usan X"`. Los filtros
+   (igual que las secciones abiertas) se vacían por completo en
+   `selectMaterial()`, nunca se conservan entre materiales.
 3. **Ficha** (`#craft-detail`): tabla de ingredientes por slot (todos, no
    solo los del material buscado — la ficha es del objeto completo),
    tiempo/tiers/masa, simulador de calidad y tabla de misiones que sueltan
