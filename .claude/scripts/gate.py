@@ -169,6 +169,11 @@ def main():
               "craftSectionKey" in craft_view_src and "CRAFT_SECTION_ES" in craft_view_src)
         check("crafting.js: craftSectionLabel degrada sin romper ante categorias sin traducir",
               re.search(r"craftSectionLabel\(key\)\s*\{[\s\S]{0,150}\|\|", craft_view_src) is not None)
+        check("crafting.js: secciones plegables via <button> real (accesible con teclado, no div+onclick)",
+              '<button type="button" class="side-group-head"' in craft_view_src)
+        check("crafting.js: cambiar de material repliega todas las secciones (acordeon)",
+              re.search(r"selectMaterial\(rawName\)\s*\{[\s\S]{0,900}openSections\s*=\s*new Set\(\)", craft_view_src)
+              is not None)
     app_js_src = (ROOT / "js" / "app.js").read_text(encoding="utf-8")
     check("app.js: Crafting.init() llamado", "Crafting.init()" in app_js_src)
     # Si sc-craft.tools reorganiza las categorias de primer nivel en un parche

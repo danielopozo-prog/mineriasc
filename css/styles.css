@@ -332,6 +332,11 @@ input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(
 .side-item.active .sub { color: var(--accent); opacity: 0.8; }
 .side-item-name { flex: 1; }
 .side-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
   padding: 6px 14px;
   font-family: var(--font-ui);
   font-size: 0.7rem;
@@ -340,8 +345,24 @@ input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(
   letter-spacing: 1px;
   color: var(--accent-2);
   background: var(--panel);
+  border: none;
   border-bottom: 1px solid var(--border-muted);
 }
+/* Cuando .side-group-head es un <button> (acordeón de secciones, p.ej.
+   Crafteo — mismo patrón de .inv-box-head en Inventario: botón real
+   accesible con teclado, no un div con onclick): reset de los estilos de
+   botón del user-agent para que se vea igual que la versión <div> ya usada
+   en Señales ("Favoritos"/"Todos", esas no son plegables). */
+button.side-group-head {
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+button.side-group-head:hover { background: var(--panel-hover); }
+.side-group-caret { color: var(--text-dim); flex-shrink: 0; }
+.side-group-body[hidden] { display: none; }
 
 /* ---------- Estrella de favorito ---------- */
 .fav-star {

@@ -132,6 +132,10 @@ const Crafting = {
   selectedBlueprintId: null,
   quality: 500, // valor del slider del simulador; se conserva al cambiar de objeto
   items: [], // [{blueprint, qty, unit, mixedUnit}] del material activo, orden ascendente por cantidad
+  // Secciones de categoría abiertas (acordeón, ver renderList): claves de
+  // craftSectionKey(). Todas plegadas por defecto; se vacía por completo al
+  // cambiar de material (selectMaterial), nunca se conserva entre materiales.
+  openSections: new Set(),
 
   init() {
     if (!DATA.craft.ready) {
@@ -199,10 +203,17 @@ const Crafting = {
       g.qty += ingredient.quantity_scu;
     }
     this.items = [...byBp.values()].sort((a, b) => a.qty - b.qty);
+    this.openSections = new Set(); // todas plegadas al cambiar de material
 
     this.renderList();
     document.getElementById("craft-detail").innerHTML =
       '<p class="placeholder">Selecciona un objeto de la lista para ver su ficha de fabricación.</p>';
+  },
+
+  toggleSection(key) {
+    if (this.openSections.has(key)) this.openSections.delete(key);
+    else this.openSections.add(key);
+    this.renderList();
   },
 
   renderList() {
@@ -235,7 +246,7 @@ const Crafting = {
       const key = craftSectionKey(row.blueprint.category);
       let sec = sections.get(key);
       if (!sec) {
-        sec = { label: craftSectionLabel(key), rows: [] };
+        sec = { key, label: craftSectionLabel(key), rows: [] };
         sections.set(key, sec);
       }
       sec.rows.push(row);
@@ -244,11 +255,19 @@ const Crafting = {
       (a, b) => b.rows.length - a.rows.length || a.label.localeCompare(b.label)
     );
 
+    // Acordeón: cada sección es un <button> real (accesible con teclado, no
+    // un div con onclick) que expande/pliega su propio cuerpo — mismo patrón
+    // ya usado en Inventario para las cajas de ubicación (.inv-box-head
+    // button + [hidden] + aria-expanded + caret ▾/▸), reutilizado aquí en vez
+    // de inventar uno nuevo. Todas plegadas por defecto (openSections se
+    // vacía en selectMaterial) para que la lista no obligue a tanto scroll.
     listEl.innerHTML = orderedSections
       .map((sec) => {
-        const head = `<div class="side-group-head">${esc(sec.label)} · ${sec.rows.length} objeto${
-          sec.rows.length === 1 ? "" : "s"
-        }</div>`;
+        const open = this.openSections.has(sec.key);
+        const head = `<button type="button" class="side-group-head" data-sec="${esc(sec.key)}" aria-expanded="${open}">
+          <span>${esc(sec.label)} · ${sec.rows.length} objeto${sec.rows.length === 1 ? "" : "s"}</span>
+          <span class="side-group-caret">${open ? "▾" : "▸"}</span>
+        </button>`;
         const rows = sec.rows
           .map(({ blueprint, qty, unit, mixedUnit }) => {
             const catLeaf = craftCategoryParts(blueprint.category).pop() || "";
@@ -260,10 +279,13 @@ const Crafting = {
             </div>`;
           })
           .join("");
-        return head + rows;
+        return `${head}<div class="side-group-body"${open ? "" : " hidden"}>${rows}</div>`;
       })
       .join("");
 
+    listEl.querySelectorAll(".side-group-head").forEach((btn) =>
+      btn.addEventListener("click", () => this.toggleSection(btn.dataset.sec))
+    );
     listEl.querySelectorAll(".side-item").forEach((el) =>
       el.addEventListener("click", () => this.selectBlueprint(Number(el.dataset.id)))
     );
