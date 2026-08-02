@@ -134,6 +134,12 @@ Quantanium/Quantainium) está resuelta en `DATA.bestSellFor`/`uexRefinedFor` —
 nombres. Estructura del JSON y su actualización: `.claude/guides/datos-juego.md`.
 Módulos y flujo: `.claude/guides/arquitectura.md`.
 
+Buscador, Ubicaciones y Crafteo tienen listas ordenables (precio/rareza/cantidad
+según la vista) que persisten el criterio en `localStorage` (`mineriasc_*_sort`).
+Crafteo usa una lista de materiales siempre visible, no un combo: reordenar un
+combo cerrado no se notaba (feedback real de uso) — detalle en
+`.claude/guides/arquitectura.md`.
+
 ## Cierre de build (reducido, tier mínimo)
 
 Al cerrar un ciclo de trabajo, en orden estricto:

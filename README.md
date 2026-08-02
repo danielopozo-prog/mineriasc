@@ -4,14 +4,14 @@ Panel de minería para **Star Citizen**, inspirado en [Strata](https://seeknd.gi
 
 ## Funcionalidades
 
-- **Buscador de minerales** — propiedades de minado (inestabilidad, resistencia, explosión), precios en vivo (refinado y en bruto), mejores refinerías donde vender, señales de escáner y ubicaciones donde aparece cada mineral.
-- **Explorador de ubicaciones** — filtro por sistema (Stanton, Pyro, Nyx), minerales disponibles en cada ubicación con su probabilidad relativa por método (nave, FPS, ROC).
+- **Buscador de minerales** — propiedades de minado (inestabilidad, resistencia, explosión), precios en vivo (refinado y en bruto), mejores refinerías donde vender, señales de escáner y ubicaciones donde aparece cada mineral. Ordenable por nombre, precio refinado, precio P2P (Marketplace) o rareza — el criterio se recuerda entre sesiones (igual en Ubicaciones y Crafteo).
+- **Explorador de ubicaciones** — filtro por sistema (Stanton, Pyro, Nyx), minerales disponibles en cada ubicación con su probabilidad relativa por método (nave, FPS, ROC), ordenable por nombre o por nº de minerales.
 - **Refinería** — métodos de refinado con valoraciones (rendimiento/coste/velocidad, en vivo de UEX) y tabla de bonos de rendimiento por estación.
 - **Inventario personal** — registra lo que minas, agrupa por mineral o ubicación, calcula el valor estimado con precios UEX y exporta a JSON o al portapapeles con formato Discord. Dos modos de alta: mineral concreto (con cantidad en SCU) o materiales genéricos (Minerales/Armas/Armaduras/Tarjetas/Pinturas/Otros) marcados con checkboxes múltiples y una nota libre compartida, sin cantidad. Todo se guarda en el `localStorage` de tu navegador.
 - **Señales** — multiplicadores de señal de escáner (x1-x15) por mineral, con búsqueda inversa y favoritos.
-- **Crafteo** — búsqueda inversa de blueprints por material: elige un mineral y ve qué objetos lo requieren, con ficha de ingredientes por slot, tiempo de fabricación, misiones que sueltan el plano y un simulador de calidad (slider 0-1000 que interpola los efectos de cada ingrediente).
+- **Crafteo** — lista lateral, siempre visible, de los 36 materiales usados en planos de fabricación (con buscador propio y ordenable por nombre, nº de objetos crafteables o rareza); al elegir uno, los objetos que lo requieren agrupados en secciones plegables con filtros por peso/pieza de armadura o tipo de arma, cada uno con ficha de ingredientes por slot, tiempo de fabricación, misiones que sueltan el plano y un simulador de calidad (slider 0-1000 que interpola los efectos de cada ingrediente).
 - **Contadores** (`contadores.html`, enlazada desde la cabecera) — temporizadores de Hangar Ejecutivo, impresoras de tarjetas, bóveda de Ruin Station, ciclo de loot y Compboards. Página hermana independiente, con su propio CSS y estado en `localStorage`.
-- **Desplegables con buscador** — cualquier selector con muchas opciones (mineral, ubicación, material de crafteo…) se abre como un combo con un cuadro de texto que filtra en vivo, insensible a mayúsculas y acentos, con navegación por teclado.
+- **Desplegables con buscador** — los selectores con muchas opciones (mineral y ubicación en Inventario, ubicación de minado en Señales…) se abren como un combo con un cuadro de texto que filtra en vivo, insensible a mayúsculas y acentos, con navegación por teclado.
 
 ## Cómo ejecutarlo
 
