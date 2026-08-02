@@ -169,23 +169,30 @@
           <span class="kicker">Star Citizen · Fabricación</span>
           <h2>Crafteo</h2>
         </div>
-        <div class="panel-head-actions">
-          <select id="craft-material-select"></select>
-          <select id="craft-material-sort" title="Ordenar por">
-            <option value="name">Nombre (A-Z)</option>
-            <option value="count">Nº de objetos</option>
-            <option value="rarity">Rareza</option>
-          </select>
-        </div>
       </div>
-      <p class="hint" id="craft-count-hint"></p>
-      <div id="craft-filters" class="craft-filters" hidden></div>
-      <div class="split" id="craft-split">
-        <aside id="craft-list" class="side-list">
-          <p class="placeholder">Elige un material arriba para ver qué se fabrica con él.</p>
-        </aside>
-        <div id="craft-detail" class="detail">
-          <p class="placeholder">Selecciona un objeto de la lista para ver su ficha de fabricación.</p>
+      <div class="craft-layout">
+        <div class="craft-materials-panel">
+          <div class="panel-head-actions craft-materials-head">
+            <input type="search" id="craft-material-search" placeholder="Busca un material… (ej. Iron)" autocomplete="off">
+            <select id="craft-material-sort" title="Ordenar por">
+              <option value="name">Nombre (A-Z)</option>
+              <option value="count">Nº de objetos</option>
+              <option value="rarity">Rareza</option>
+            </select>
+          </div>
+          <aside id="craft-materials" class="side-list craft-materials-list"></aside>
+        </div>
+        <div class="craft-main">
+          <p class="hint" id="craft-count-hint"></p>
+          <div id="craft-filters" class="craft-filters" hidden></div>
+          <div class="split" id="craft-split">
+            <aside id="craft-list" class="side-list">
+              <p class="placeholder">Elige un material a la izquierda para ver qué se fabrica con él.</p>
+            </aside>
+            <div id="craft-detail" class="detail">
+              <p class="placeholder">Selecciona un objeto de la lista para ver su ficha de fabricación.</p>
+            </div>
+          </div>
         </div>
       </div>
       <p class="hint craft-credit">Datos de blueprints: sc-craft.tools</p>

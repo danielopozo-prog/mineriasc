@@ -83,12 +83,13 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
   `<option>` se marca "(cargando…)" mientras tanto y el orden cae al empate
   alfabético sin romper — se recalcula solo cuando `app.js` vuelve a llamar a
   `renderList()` tras `loadUexPrices()`/`loadMarketplaceAverages()`.
-  `js/crafting.js` reordena las `<option>` del propio `#craft-material-select`
-  (un `SearchSelect`) en vez de añadir una API nueva a `js/searchselect.js`:
-  reasignar `sel.innerHTML` + restaurar `sel.value` + `sel._sselApi.sync()`
-  basta, porque el `MutationObserver` interno de `SearchSelect` ya refresca el
-  panel de opciones solo si estaba abierto. El criterio "rareza" de Crafteo
-  (`craftMaterialRarity`) resuelve el material al mineral de `DATA.ores` vía
+  Crafteo es la excepción de marcado: su lista de materiales NO es un
+  `<select>` — es una lista lateral SIEMPRE VISIBLE (`#craft-materials`, ver
+  más abajo), porque reordenar las `<option>` de un combo cerrado (como se
+  hizo primero, reutilizando `SearchSelect`) no se percibía como "la lista se
+  reordena de verdad" hasta abrirlo — feedback real de uso. El criterio
+  "rareza" de Crafteo (`craftMaterialRarity`) resuelve el material al mineral
+  de `DATA.ores` vía
   `DATA.oreKeyForCraftMaterial(rawName)` — resolutor INVERSO de la
   normalización que ya usa `craftByMaterial` (`CRAFT_NAME_OVERRIDES` +
   `craftBaseName`), expuesto por datos-uex a petición de esta vista (antes
@@ -169,19 +170,33 @@ mineral?" (Buscador), "¿para qué sirve?". Datos 100% locales
 `Crafting.init()` no depende de ninguna API en vivo, a diferencia de
 Finder/Locations (precios UEX).
 
-Flujo (mismo patrón `.split` de side-list + detail que el resto de pestañas,
-más un selector de material arriba en vez de un buscador de texto libre):
+Layout de 3 columnas (`.craft-layout`, grid `260px 1fr`, colapsa a 1 columna
+por debajo de 800px igual que `.split`): lista de materiales SIEMPRE VISIBLE a
+la izquierda, y a la derecha el `.craft-main` con el `.split` de siempre
+(lista de objetos + ficha). Sigue utilizable a 1280px de ancho (verificado):
+materiales ~260px + `.split` interno 280px + resto para la ficha.
 
-1. **Selector de material** (`#craft-material-select`, envuelto con
-   `SearchSelect.enhance` — 36 materiales, muy por encima del umbral de 5-6
-   del combo con buscador). Las opciones se derivan de
-   `Crafting.materialsIndex()`, que recorre `DATA.craftBlueprints()` en vez
-   de `DATA.ores`: no todo material de sc-craft.tools es un mineral de
-   mining_data.json (`"Pressurized Ice"`, ver `CRAFT_NAME_OVERRIDES` en
-   `js/data.js`) — recorrer solo `ores` dejaría fuera ese material pese a que
-   sí tiene planos. El `value` de cada `<option>` es el nombre EXACTO de
-   `ingredients[].name` (no una clave normalizada): se le pasa tal cual a
-   `DATA.craftByMaterial()`, que ya sabe normalizarlo.
+1. **Lista de materiales** (`#craft-materials`, `.side-item` estándar dentro
+   de `.craft-materials-panel` — NO un `<select>`/combo: se probó primero
+   como un `<select>` envuelto con `SearchSelect.enhance`, pero reordenar las
+   `<option>` de un combo cerrado no se percibía como "la lista se reordena
+   de verdad" hasta abrirlo, así que se sustituyó por una lista lateral
+   visible con su propio buscador (`#craft-material-search`) y su propio
+   `<select>` de orden (`#craft-material-sort`, ≤5 opciones, sin
+   `SearchSelect`) en `.craft-materials-head`). Cada fila: punto de rareza
+   (`craftMaterialRarityDotHtml`, reutiliza `rarityDotHtml` de `js/finder.js`
+   — carga antes, ya disponible como global) + nombre a la izquierda, nº de
+   objetos crafteables a la derecha; fila activa resaltada igual que el resto
+   de listas laterales. Las filas se derivan de `Crafting.materialsIndex()`,
+   que recorre `DATA.craftBlueprints()` en vez de `DATA.ores`: no todo
+   material de sc-craft.tools es un mineral de mining_data.json
+   (`"Pressurized Ice"`, ver `CRAFT_NAME_OVERRIDES` en `js/data.js`) —
+   recorrer solo `ores` dejaría fuera ese material pese a que sí tiene
+   planos. `Crafting.sortedMaterials()` aplica `this.materialSort`;
+   `renderMaterials()` filtra además por `this.materialSearch` y repinta. El
+   identificador que viaja por toda la vista (`data-raw`, `this.selectedMaterial`)
+   es el nombre EXACTO de `ingredients[].name` (no una clave normalizada): se
+   le pasa tal cual a `DATA.craftByMaterial()`, que ya sabe normalizarlo.
 2. **Lista de objetos** (`#craft-list`, `.side-item` estándar): un plano
    puede usar el mismo material en 2+ slots distintos (66 planos en el
    parche actual, p.ej. "QuikCool" usa Iron en `SHELL` y en `PUMP IMPELLER`)

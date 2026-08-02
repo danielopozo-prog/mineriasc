@@ -1,11 +1,20 @@
 /* Pestaña «Crafteo»: búsqueda inversa de planos de fabricación por material
    (inspirada en sc-craft.tools, pero al revés — del material al objeto).
-   Flujo: elegir material (combo con buscador) -> lista de objetos que lo
-   requieren, ordenada de menor a mayor cantidad -> ficha con ingredientes
-   por slot, tiempo, tiers, simulador de calidad (slider 0-1000) y misiones
-   que sueltan el plano. Datos: DATA.craftBlueprints()/DATA.craftByMaterial()
-   (ver js/data.js y .claude/guides/datos-juego.md) — 100% local, sin API en
-   vivo, así que ya están disponibles tras `await DATA.load()`. */
+   Layout de 3 columnas (ver .craft-layout en css/styles.css): lista de
+   MATERIALES siempre visible a la izquierda (#craft-materials, con su propio
+   buscador y su propio orden — ver .craft-materials-panel) -> al elegir uno,
+   lista de objetos que lo requieren en el centro (#craft-list, agrupada en
+   secciones-acordeón), ordenada de menor a mayor cantidad -> ficha a la
+   derecha (#craft-detail) con ingredientes por slot, tiempo, tiers,
+   simulador de calidad (slider 0-1000) y misiones que sueltan el plano.
+   La lista de materiales fue antes un <select> envuelto con SearchSelect
+   (js/searchselect.js): se retiró de esta pestaña porque, dentro de un
+   combo cerrado, reordenar sus <option> no se percibe como "la lista se
+   reordena" — el usuario solo lo nota si la lista está siempre a la vista.
+   searchselect.js sigue intacto y en uso en Inventario/Señales.
+   Datos: DATA.craftBlueprints()/DATA.craftByMaterial() (ver js/data.js y
+   .claude/guides/datos-juego.md) — 100% local, sin API en vivo, así que ya
+   están disponibles tras `await DATA.load()`. */
 
 // Cantidad de un ingrediente, formateada según su unidad real (contrato de
 // data/craft_blueprints.json, ver datos-juego.md):
@@ -206,6 +215,15 @@ function craftMaterialRarity(rawName) {
   return oreKey ? DATA.rarityFor(oreKey) : null;
 }
 
+// Punto de color de rareza para una fila de la lista de materiales — mismo
+// formato que usa el Buscador (rarityDotHtml de js/finder.js, que carga
+// antes que este módulo y queda disponible como global), reutilizado tal
+// cual en vez de duplicar el marcado/CSS de la rareza.
+function craftMaterialRarityDotHtml(rawName) {
+  const oreKey = DATA.oreKeyForCraftMaterial(rawName);
+  return oreKey ? rarityDotHtml(oreKey) : "";
+}
+
 const CRAFT_MATERIAL_SORT_LABELS = {
   name: "Nombre (A-Z)",
   count: "Nº de objetos",
@@ -228,6 +246,7 @@ const Crafting = {
   filters: { weight: new Set(), piece: new Set(), weaponType: new Set() },
   materialSort: "name",
   MATERIAL_SORT_KEY: "mineriasc_crafting_sort",
+  materialSearch: "", // texto del buscador de materiales, en minúsculas
 
   init() {
     if (!DATA.craft.ready) {
@@ -241,14 +260,15 @@ const Crafting = {
     sortSel.addEventListener("change", () => {
       this.materialSort = sortSel.value;
       this.saveMaterialSort();
-      this.renderMaterialOptions();
+      this.renderMaterials();
     });
 
-    const sel = document.getElementById("craft-material-select");
-    this.renderMaterialOptions();
-    SearchSelect.enhance(sel, { placeholder: "Buscar material…" });
-    sel.addEventListener("change", () => this.selectMaterial(sel.value));
+    document.getElementById("craft-material-search").addEventListener("input", (e) => {
+      this.materialSearch = e.target.value.trim().toLowerCase();
+      this.renderMaterials();
+    });
 
+    this.renderMaterials();
     this.renderFilters();
     this.renderList();
   },
@@ -277,10 +297,10 @@ const Crafting = {
   // CRAFT_NAME_OVERRIDES en js/data.js). `rawName` es el nombre EXACTO tal
   // como aparece en ingredients[].name: se le pasa tal cual a
   // DATA.craftByMaterial(), que ya sabe normalizarlo (craftBaseName). `label`
-  // solo pela el sufijo "(Ore)" para que el combo no muestre "Saldynium
+  // solo pela el sufijo "(Ore)" para que la lista no muestre "Saldynium
   // (Ore)" — normalización puramente de presentación, no toca el índice.
-  // Sin ordenar a propósito: el orden lo decide renderMaterialOptions()
-  // según this.materialSort.
+  // Sin ordenar a propósito: el orden lo decide sortedMaterials() según
+  // this.materialSort.
   materialsIndex() {
     const map = new Map();
     for (const bp of DATA.craftBlueprints()) {
@@ -300,24 +320,17 @@ const Crafting = {
     return [...map.values()].map((e) => ({ label: e.label, rawName: e.rawName, count: e.blueprintIds.size }));
   },
 
-  // Reconstruye las <option> de #craft-material-select en el orden elegido,
-  // conservando la selección actual (si había una) y sincronizando el combo
-  // con buscador (js/searchselect.js): reasignar sel.innerHTML no dispara
-  // "change", así que hay que restaurar sel.value a mano y llamar a
-  // _sselApi.sync() para refrescar la etiqueta visible del combo — el
-  // MutationObserver interno de SearchSelect ya se encarga de refrescar el
-  // panel de opciones si estaba abierto en ese momento.
-  renderMaterialOptions() {
-    const sel = document.getElementById("craft-material-select");
-    const currentValue = sel.value;
+  // Orden actual de this.materialsIndex() según this.materialSort — misma
+  // lógica que antes montaba las <option> del combo, ahora reutilizada para
+  // pintar la lista lateral visible (#craft-materials).
+  sortedMaterials() {
     const materials = this.materialsIndex();
-
-    let sorted;
     if (this.materialSort === "count") {
       // Descendente por defecto: el material con más objetos crafteables arriba.
-      sorted = [...materials].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
-    } else if (this.materialSort === "rarity") {
-      sorted = [...materials].sort((a, b) => {
+      return [...materials].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    }
+    if (this.materialSort === "rarity") {
+      return [...materials].sort((a, b) => {
         const ra = craftMaterialRarity(a.rawName);
         const rb = craftMaterialRarity(b.rawName);
         const va = ra ? RARITY_ORDER[ra.tier] : null;
@@ -327,21 +340,36 @@ const Crafting = {
         if (vb == null) return -1;
         return vb - va; // legendaria primero
       });
-    } else {
-      sorted = [...materials].sort((a, b) => a.label.localeCompare(b.label));
+    }
+    return [...materials].sort((a, b) => a.label.localeCompare(b.label));
+  },
+
+  // Lista lateral de materiales (#craft-materials), siempre visible — a
+  // diferencia del combo con buscador que sustituye, reordenar aquí SÍ se ve
+  // de inmediato. Punto de rareza (si el material resuelve a un mineral de
+  // DATA.ores) + nombre a la izquierda, nº de objetos crafteables a la
+  // derecha; fila activa resaltada igual que el resto de listas laterales.
+  renderMaterials() {
+    const listEl = document.getElementById("craft-materials");
+    const sorted = this.sortedMaterials().filter((m) => m.label.toLowerCase().includes(this.materialSearch));
+
+    if (!sorted.length) {
+      listEl.innerHTML = '<p class="placeholder">Ningún material coincide con la búsqueda.</p>';
+      return;
     }
 
-    sel.innerHTML =
-      `<option value="" disabled ${currentValue ? "" : "selected"}>Elige un material…</option>` +
-      sorted
-        .map(
-          (m) =>
-            `<option value="${esc(m.rawName)}">${esc(m.label)} · ${m.count} objeto${m.count === 1 ? "" : "s"}</option>`
-        )
-        .join("");
+    listEl.innerHTML = sorted
+      .map(
+        (m) => `<div class="side-item ${m.rawName === this.selectedMaterial ? "active" : ""}" data-raw="${esc(m.rawName)}">
+          <span class="side-item-name">${craftMaterialRarityDotHtml(m.rawName)}${esc(m.label)}</span>
+          <span class="sub">${m.count} objeto${m.count === 1 ? "" : "s"}</span>
+        </div>`
+      )
+      .join("");
 
-    if (currentValue) sel.value = currentValue;
-    sel._sselApi?.sync();
+    listEl.querySelectorAll(".side-item").forEach((el) =>
+      el.addEventListener("click", () => this.selectMaterial(el.dataset.raw))
+    );
   },
 
   selectMaterial(rawName) {
@@ -377,6 +405,7 @@ const Crafting = {
     this.openSections = new Set(); // todas plegadas al cambiar de material
     this.filters = { weight: new Set(), piece: new Set(), weaponType: new Set() }; // filtros a cero
 
+    this.renderMaterials(); // refresca qué fila de #craft-materials queda "active"
     this.renderFilters();
     this.renderList();
     document.getElementById("craft-detail").innerHTML =
@@ -468,7 +497,7 @@ const Crafting = {
 
     if (!this.selectedMaterial) {
       countHint.textContent = "";
-      listEl.innerHTML = '<p class="placeholder">Elige un material arriba para ver qué se fabrica con él.</p>';
+      listEl.innerHTML = '<p class="placeholder">Elige un material a la izquierda para ver qué se fabrica con él.</p>';
       return;
     }
 
@@ -674,11 +703,14 @@ const Crafting = {
   // Degradación cuando data/craft_blueprints.json no cargó (falta o está
   // corrupto): DATA.craft.ready queda en false pero el resto de la app sigue
   // funcionando (ver contrato en js/data.js) — aquí solo se avisa, sin
-  // romper nada ni dejar el selector en un estado ambiguo.
+  // romper nada ni dejar los controles en un estado ambiguo.
   renderUnavailable() {
-    const sel = document.getElementById("craft-material-select");
-    sel.disabled = true;
-    sel.innerHTML = '<option value="">Datos de crafteo no disponibles</option>';
+    const searchInp = document.getElementById("craft-material-search");
+    const sortSel = document.getElementById("craft-material-sort");
+    searchInp.disabled = true;
+    sortSel.disabled = true;
+    document.getElementById("craft-materials").innerHTML =
+      '<p class="placeholder">Datos de crafteo no disponibles.</p>';
     document.getElementById("craft-count-hint").textContent = "";
     document.getElementById("craft-filters").hidden = true;
     document.getElementById("craft-list").innerHTML = "";

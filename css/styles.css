@@ -565,6 +565,33 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
 .card .row b { color: var(--text); }
 
 /* ---------- Crafteo ---------- */
+/* Layout de 3 columnas: lista de materiales (siempre visible, izquierda) +
+   lista de objetos/ficha (.craft-main, que reutiliza el .split de 2
+   columnas ya existente) a la derecha. Mismo criterio de colapso a 1 sola
+   columna a <800px que .split, para que el patrón responsive sea coherente
+   en toda la pestaña — a 1280px de ancho quedan sobradas las 2 columnas
+   (materiales ~260px + gap + .craft-main con su propio .split interno de
+   280px + resto para la ficha). */
+.craft-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+@media (max-width: 800px) { .craft-layout { grid-template-columns: 1fr; } }
+.craft-materials-panel { display: flex; flex-direction: column; gap: 10px; }
+/* Buscador + orden apilados en vertical dentro de una columna estrecha: el
+   flex-row de .panel-head-actions no tiene sitio para 2 controles de
+   min-width 220px en 260px de columna — aquí SÍ tiene que ir en columna. */
+.craft-materials-head { flex-direction: column; align-items: stretch; gap: 6px; }
+.craft-materials-head input[type="search"],
+.craft-materials-head select {
+  min-width: 0;
+  width: 100%;
+}
+.craft-materials-list { max-height: 75vh; }
+
 /* Meta del lado derecho de cada .side-item (cantidad del material + tiempo
    de fabricación, en 2 líneas): alineado a la derecha, a juego con el resto
    de metadatos ".sub" de los que hereda color/tamaño. */

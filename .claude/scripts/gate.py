@@ -157,8 +157,16 @@ def main():
     check("js/crafting.js existe", craft_view_path.exists())
     if craft_view_path.exists():
         craft_view_src = craft_view_path.read_text(encoding="utf-8")
-        check("crafting.js: usa SearchSelect.enhance para el selector de material",
-              "SearchSelect.enhance" in craft_view_src)
+        # La lista de materiales es una lista lateral SIEMPRE VISIBLE
+        # (#craft-materials), no un <select>/combo: reordenarla dentro de un
+        # combo cerrado no se percibia como "se reordena de verdad" (feedback
+        # de usuario). searchselect.js sigue existiendo y en uso en
+        # Inventario/Señales — este check solo confirma que Crafteo YA NO lo
+        # usa, para no reintroducir el combo por error.
+        check("crafting.js: NO llama a SearchSelect.enhance (retirado a favor de una lista lateral visible)",
+              "SearchSelect.enhance(" not in craft_view_src)
+        check("crafting.js: lista de materiales visible con buscador propio",
+              "craft-material-search" in craft_view_src and "craft-materials" in craft_view_src)
         check("crafting.js: interpolacion de calidad respeta 'ranges' (tramos no lineales)",
               ".ranges" in craft_view_src)
         check("crafting.js: fmtCraftQty distingue unit 'unit' (ud) de 'scu' (SCU/cSCU)",
