@@ -82,7 +82,10 @@ const SearchSelect = {
       const opt = select.selectedOptions[0];
       const text = opt ? opt.textContent : "";
       label.textContent = text;
-      label.classList.toggle("placeholder", !opt || opt.disabled || opt.value === "");
+      // "ssel-placeholder-value" (NO "placeholder": esa clase ya existe global
+      // en css/styles.css para los mensajes de estado vacío con padding:60px
+      // 20px — colisionaba y disparaba la regresión de altura del formulario).
+      label.classList.toggle("ssel-placeholder-value", !opt || opt.disabled || opt.value === "");
     }
 
     function syncAttrs() {

@@ -127,3 +127,72 @@ python .claude/scripts/fetch_uex_locations.py
   **mining_data.json como fuente prioritaria** (ya integrada con
   `oreToLocations`/`refineries`/etc.) — así `"MIC-L1"` sale una sola vez, con
   `kind: "lagrange"` (el de Strata), no `"station"` (el de UEX).
+
+## Catálogo de planos de crafteo (`data/craft_blueprints.json`)
+
+Planos de fabricación del juego (~1589 en el parche actual: armas, armaduras,
+munición, componentes de nave...) que consumen materiales — entre ellos, los
+minerales de `mining_data.json`. Da la vuelta a la pregunta del Buscador: no
+"¿dónde vendo este mineral?" sino "¿para qué sirve este mineral?". Dato
+generado igual que los otros dos: **nunca se edita a mano**.
+
+```bash
+python .claude/scripts/fetch_craft_blueprints.py
+```
+
+- Fuente: API pública de sc-craft.tools (tras Cloudflare — el script manda
+  User-Agent de navegador, mismo motivo que `fetch_uex_locations.py` con UEX).
+  Primero `GET /api/config` para resolver la versión `live` activa (evita
+  vendorizar planos de PTU, que pueden no reflejar el juego publicado), luego
+  pagina `GET /api/blueprints?page=N&limit=100&search=&version=<version>`
+  **sin** `ownable=1` — con ese parámetro la API solo devuelve los planos que
+  posee la cuenta autenticada; sin él, el catálogo completo (~1589, verificado
+  contra `stats.totalBlueprints` de `/api/config`). El servidor capa `limit` a
+  100 aunque se pida más (probado con `limit=500`): 16 páginas en el parche
+  actual.
+- Recorte respecto al payload crudo de la API (más pesado: fire_modes
+  detallados de armas, loc_keys, guids de ingrediente...): se conserva todo lo
+  que la vista necesita — `id`, `blueprint_id`, `name`, `category` (ruta tipo
+  `"Vehiclegear / Weapons / Ballistic / Cannon"`), `craft_time_seconds`,
+  `tiers`, `item_stats` (sin `fire_modes`: masa, resistencias, tipo... varía
+  de forma según la categoría del ítem, no se normaliza), `ingredients[]`
+  (`slot`, `name`, `quantity_scu`, `unit` — `"scu"` o `"unit"`, unidades
+  sueltas, **no** SCU —, `min_quality`, `quality_effects[]` completo con
+  `stat`/`quality_min`/`quality_max`/`modifier_at_min`/`modifier_at_max`/`type`
+  y `ranges` opcional para efectos no lineales) y `missions[]`
+  (`mission_id`, `name`, `drop_chance` como número, no como el string
+  `"1.0000"` que trae la API cruda).
+- Tamaño real (parche actual, versión `LIVE-4.9.0-12232306`): ~4,1 MB, 1589
+  planos. Es, con diferencia, el fichero de dato generado más grande del
+  proyecto (mining_data.json ~290 KB, uex_locations.json ~24 KB) — el peso
+  vive casi todo en `ingredients[].quality_effects` (~1,45 MB de los ~2,4 MB
+  en crudo sin indentar): se conserva completo a propósito, es justo el tipo
+  de dato "no es lineal, no lo aproximes" que ya justificaba
+  `QUALITY_TIER_LABELS` en `js/data.js`. Si el tamaño se vuelve un problema
+  real de carga, la vía es lazy-load bajo demanda (fetch solo al abrir una
+  pestaña de crafteo), no recortar `quality_effects`.
+- Solo 36 nombres de material distintos aparecen como ingrediente en los 1589
+  planos (verificado, no una muestra) — todos son minerales de
+  `mining_data.json` salvo `"Pressurized Ice"` (commodity distinta del `ICE`
+  de minería, sin entrada en `ores`). Dos grafías de sc-craft.tools NO
+  coinciden con `ore.display_name` de mining_data.json: `"Aluminum"`
+  (americano; mining_data.json trae `"Aluminium"`, británico) y
+  `"Quantainium"` (mining_data.json trae `"Quantanium"`) — corregidas en
+  `CRAFT_NAME_OVERRIDES` (js/data.js), tabla **propia de esta fuente**, no
+  reutilizar `UEX_NAME_OVERRIDES` ni al revés (quirks de APIs distintas,
+  verificados por separado). Un único sufijo de "en bruto" visto:
+  `"Saldynium (Ore)"` — lo quita `craftBaseName()`, deliberadamente más simple
+  que `uexBaseName()` (esa cubre 3 patrones reales de UEX; aquí solo hay uno
+  verificado, no se adivina un patrón de más).
+- Consumo: `DATA.load()` lo carga en `DATA.craft.blueprints` tras
+  `mining_data.json`/`uex_locations.json`, envuelto en `try/catch` — si falta,
+  `DATA.craftBlueprints()`/`DATA.craftByMaterial()` devuelven `[]` sin romper
+  el arranque. Contrato expuesto:
+  - `DATA.craftBlueprints()` → `[]` con la lista completa de planos tal cual
+    vienen en el JSON (referencia, no copia).
+  - `DATA.craftByMaterial(oreKeyOrName)` → `[{blueprint, ingredient}]`, el
+    índice inverso material → planos. Acepta una clave de `DATA.ores`
+    (`"QUANTANIUM"`, `"ALUMINUM"`...) — se resuelve por
+    `CRAFT_NAME_OVERRIDES`/`display_name`, igual patrón que `uexFor` — o un
+    nombre de material libre normalizado igual. `[]` si no hay ningún plano
+    (nunca `null`).

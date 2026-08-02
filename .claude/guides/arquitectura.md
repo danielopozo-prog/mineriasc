@@ -15,6 +15,8 @@ js/refinery.js   → objeto Refinery (pestaña Refinería, render perezoso)
 js/inventory.js  → objeto Inventory (pestaña Inventario)
 js/signals.js    → objeto Signals (pestaña Señales, múltiplos de escáner,
                    búsqueda inversa y favoritos de mineral)
+js/crafting.js   → objeto Crafting (pestaña Crafteo, búsqueda inversa de
+                   blueprints por material, ver más abajo)
 js/app.js        → arranque: DATA.load() → init de vistas → DATA.loadUexPrices()
 ```
 
@@ -25,13 +27,17 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
 1. `DATA.load()` — carga `data/mining_data.json` y construye índices; si falla, la app
    muestra error y no sigue. A continuación carga también `data/uex_locations.json`
    (catálogo ampliado de ciudades/estaciones/outposts, vendorizado desde UEX — ver
-   `.claude/guides/datos-juego.md`) envuelto en `try/catch`: si falta o está corrupto,
-   `DATA.uexLocations` queda `[]` y `DATA.allLocations()` sigue funcionando solo con las
-   zonas de minado de `mining_data.json`, sin bloquear el arranque.
-2. `Finder.init()`, `Locations.init()`, `Inventory.init()`, `Signals.init()` — la app ya
-   es usable con datos de juego, sin precios. Cualquier vista que necesite el listado
-   COMPLETO de ubicaciones (no solo zonas de minado) usa `DATA.allLocations()` — síncrona,
-   ya resuelta tras `await DATA.load()`, sin fetch adicional.
+   `.claude/guides/datos-juego.md`) y `data/craft_blueprints.json` (planos de fabricación,
+   vendorizados desde sc-craft.tools), ambos envueltos en `try/catch`: si faltan o están
+   corruptos, `DATA.uexLocations`/`DATA.craft.blueprints` quedan `[]` y el resto de la app
+   (incluida la pestaña Crafteo, con su propio mensaje de estado) sigue funcionando sin
+   bloquear el arranque.
+2. `Finder.init()`, `Locations.init()`, `Inventory.init()`, `Signals.init()`,
+   `Crafting.init()` — la app ya es usable con datos de juego, sin precios. Cualquier
+   vista que necesite el listado COMPLETO de ubicaciones (no solo zonas de minado) usa
+   `DATA.allLocations()` — síncrona, ya resuelta tras `await DATA.load()`, sin fetch
+   adicional. `Crafting.init()` no depende de UEX en absoluto (100% datos locales, igual
+   que `DATA.craftBlueprints()`/`DATA.craftByMaterial()`).
 3. `DATA.loadUexPrices()` — en segundo plano; al resolver, re-renderiza las vistas que
    muestran precios (`Signals` no depende de UEX — solo lee `scanner_signals`, así que
    no se refresca aquí). Si la API falla, la app sigue funcionando (el header lo indica).
@@ -121,6 +127,67 @@ gana siempre a la hoja de estilos del user-agent (mismo motivo que
 `.split[hidden]`/`.inv-box-body[hidden]`, comentado más arriba en el propio
 CSS) y `.ssel-panel .ssel-search` con especificidad reforzada para no perder
 frente a `.inv-form input`.
+
+## Pestaña Crafteo (`js/crafting.js`)
+
+Búsqueda inversa de planos de fabricación: en vez de "¿dónde vendo este
+mineral?" (Buscador), "¿para qué sirve?". Datos 100% locales
+(`DATA.craftBlueprints()`/`DATA.craftByMaterial()`, ver `js/data.js` y
+`.claude/guides/datos-juego.md`), ya resueltos tras `await DATA.load()` —
+`Crafting.init()` no depende de ninguna API en vivo, a diferencia de
+Finder/Locations (precios UEX).
+
+Flujo (mismo patrón `.split` de side-list + detail que el resto de pestañas,
+más un selector de material arriba en vez de un buscador de texto libre):
+
+1. **Selector de material** (`#craft-material-select`, envuelto con
+   `SearchSelect.enhance` — 36 materiales, muy por encima del umbral de 5-6
+   del combo con buscador). Las opciones se derivan de
+   `Crafting.materialsIndex()`, que recorre `DATA.craftBlueprints()` en vez
+   de `DATA.ores`: no todo material de sc-craft.tools es un mineral de
+   mining_data.json (`"Pressurized Ice"`, ver `CRAFT_NAME_OVERRIDES` en
+   `js/data.js`) — recorrer solo `ores` dejaría fuera ese material pese a que
+   sí tiene planos. El `value` de cada `<option>` es el nombre EXACTO de
+   `ingredients[].name` (no una clave normalizada): se le pasa tal cual a
+   `DATA.craftByMaterial()`, que ya sabe normalizarlo.
+2. **Lista de objetos** (`#craft-list`, `.side-item` estándar): un plano
+   puede usar el mismo material en 2+ slots distintos (66 planos en el
+   parche actual, p.ej. "QuikCool" usa Iron en `SHELL` y en `PUMP IMPELLER`)
+   — `Crafting.selectMaterial()` agrupa por `blueprint.id` sumando la
+   cantidad, así que el contador "N objetos usan X" cuenta objetos
+   DISTINTOS, no filas de ingrediente (con Iron, por ejemplo, son 227
+   objetos distintos pero 247 filas de ingrediente — la cifra correcta para
+   "cuántos objetos" es la primera). Orden ascendente por cantidad.
+3. **Ficha** (`#craft-detail`): tabla de ingredientes por slot (todos, no
+   solo los del material buscado — la ficha es del objeto completo),
+   tiempo/tiers/masa, simulador de calidad y tabla de misiones que sueltan
+   el plano (`missions[]`, ordenadas por `drop_chance` descendente).
+
+**Simulador de calidad**: un único slider 0-1000 (`input[type=range]`,
+estilado con `accent-color` en vez de pseudo-elementos de thumb — más simple
+y suficiente para el tema oscuro) controla TODOS los ingredientes a la vez.
+`interpolateQualityEffect(qe, q)` interpola `modifier_at_min` → 
+`modifier_at_max` sobre `quality_min` → `quality_max`; si el efecto trae
+`ranges` (tramos no lineales, p.ej. Power Pips en escalones de 250 en 250),
+interpola DENTRO del tramo que contiene `q` en vez de en línea recta de
+extremo a extremo — ignorar `ranges` da un resultado intermedio incorrecto.
+Los dos `type` reales (`multiplicative`/`additive`) se formatean distinto
+(`fmtQualityEffectValue`): un modificador `multiplicative` es un factor sobre
+el stat base y se muestra como % (`115,0%`); uno `additive` es una cifra que
+se SUMA al stat base (p.ej. Power Pips ±2) y se muestra como delta con signo
+(`+2,00`) — mostrarlo como porcentaje sería falso, no es una proporción.
+
+**Formato de cantidades** (`fmtCraftQty`, mismo contrato que
+`ingredients[].unit`/`quantity_scu` — ver datos-juego.md): `unit: "scu"` con
+`quantity_scu < 1` se muestra en cSCU (×100, más legible que "0,06 SCU");
+`≥ 1`, en SCU con 2 decimales. `unit: "unit"` es un conteo de unidades
+sueltas — **no** SCU pese al nombre del campo — se muestra tal cual con
+sufijo "ud".
+
+**Degradación**: si `data/craft_blueprints.json` no cargó,
+`DATA.craft.ready` queda `false` (ver contrato en `js/data.js`) y
+`Crafting.init()` llama a `renderUnavailable()` en vez de montar el selector
+— mensaje de estado, selector deshabilitado, resto de la app intacta.
 
 ## Página hermana: `contadores.html`
 

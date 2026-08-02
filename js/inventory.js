@@ -5,11 +5,22 @@
    Dos tipos de registro conviven en `entries`:
    - Mineral concreto (formato original, intacto para no perder datos ya
      guardados): { id, ore, qty, loc, date }. Se identifica por tener `ore`.
+     Modo de formulario "Mineral concreto": select con buscador + SCU,
+     sin cambios de comportamiento.
    - Entrada genérica por categoría (Minerales/Armas/Armaduras/Tarjetas/
-     Pinturas/Otros), sin especificar qué mineral o qué ítem exacto:
-     { id, category, qty, unit, loc, note, date }. Se identifica por tener
-     `category`. Nunca tiene precio UEX: `valueOf()` devuelve null a
-     propósito, no se inventa una valoración. */
+     Pinturas/Otros): { id, category, qty, unit, loc, note, date }. Se
+     identifica por tener `category`. Nunca tiene precio UEX: `valueOf()`
+     devuelve null a propósito, no se inventa una valoración. Dos variantes
+     conviven por compatibilidad hacia atrás — distinguirlas con `hasQty()`,
+     nunca comprobando `qty` a pelo:
+       - Con cantidad (formato original, ya no se crea desde el formulario
+         actual pero los datos guardados se siguen leyendo/exportando tal
+         cual): qty/unit numéricos, un select de categoría + campo SCU.
+       - Sin cantidad (modo por defecto del formulario actual: tira de
+         checkboxes múltiples + una nota de texto libre compartida): qty y
+         unit son `null` a propósito, nunca se inventa una cantidad ni una
+         unidad. Marcar varias categorías a la vez crea una entrada por
+         cada una, con la misma nota y fecha. */
 
 const CATEGORY_ES = {
   mineral: "Minerales",
@@ -59,10 +70,22 @@ const Inventory = {
         .map(([k, o]) => `<option value="${k}">${esc(o.display_name)}</option>`)
         .join("");
 
-    const catSel = document.getElementById("inv-category");
-    catSel.innerHTML = Object.entries(CATEGORY_ES)
-      .map(([k, label]) => `<option value="${k}">${esc(label)}</option>`)
+    // Tira de categorías con checkbox (modo "Materiales genéricos"): un
+    // <label> por categoría, marcado múltiple. El listener de "change" solo
+    // sincroniza la clase visual ".checked" del <label> — la lectura real
+    // de qué está marcado ocurre en add() al enviar el formulario.
+    const catChecksEl = document.getElementById("inv-cat-checks");
+    catChecksEl.innerHTML = Object.entries(CATEGORY_ES)
+      .map(
+        ([k, label]) =>
+          `<label class="inv-cat-check"><input type="checkbox" value="${k}"><span>${esc(label)}</span></label>`
+      )
       .join("");
+    catChecksEl.addEventListener("change", (e) => {
+      if (e.target.matches('input[type="checkbox"]')) {
+        e.target.closest(".inv-cat-check")?.classList.toggle("checked", e.target.checked);
+      }
+    });
 
     // Catálogo COMPLETO de ubicaciones (237: ciudades, estaciones tipo
     // MIC-L1, outposts y zonas de minado), agrupado por sistema.
@@ -88,17 +111,14 @@ const Inventory = {
         .join("");
 
     // Combos con buscador: mineral (100+ opciones) y ubicación (237, con
-    // optgroups por sistema) los necesitan de sobra; categoría tiene 6
-    // (justo por encima del umbral de 5 en el que un <select> nativo sigue
-    // siendo lo más simple). El <select> original sigue siendo la fuente de
-    // verdad (ver js/searchselect.js) — todo lo de abajo (updateEntryTypeUI,
-    // add()) sigue leyendo/escribiendo sobre él sin cambios.
+    // optgroups por sistema) los necesitan de sobra. El <select> original
+    // sigue siendo la fuente de verdad (ver js/searchselect.js) — todo lo
+    // de abajo (updateEntryTypeUI, add()) sigue leyendo/escribiendo sobre
+    // él sin cambios.
     SearchSelect.enhance(oreSel, { placeholder: "Buscar mineral…" });
-    SearchSelect.enhance(catSel, { placeholder: "Buscar categoría…" });
     SearchSelect.enhance(locSel, { placeholder: "Buscar ubicación…" });
 
     document.getElementById("inv-entry-type").addEventListener("change", () => this.updateEntryTypeUI());
-    document.getElementById("inv-category").addEventListener("change", () => this.updateEntryTypeUI());
     this.updateEntryTypeUI();
 
     document.getElementById("inv-form").addEventListener("submit", (e) => {
@@ -118,28 +138,34 @@ const Inventory = {
     this.setGroup(this.groupBy);
   },
 
-  // Alterna el formulario entre "mineral concreto" (flujo original) y
-  // "categoría genérica": oculta/deshabilita lo que no toca en cada modo para
-  // que el required de los campos ocultos no bloquee el submit.
+  // Alterna el formulario entre "Materiales genéricos" (checkboxes múltiples
+  // + nota, por defecto) y "Mineral concreto" (select con buscador + SCU):
+  // oculta/deshabilita lo que no toca en cada modo para que el required de
+  // los campos ocultos no bloquee el submit.
   updateEntryTypeUI() {
     const isGenericMode = document.getElementById("inv-entry-type").value === "generic";
     const oreSel = document.getElementById("inv-ore");
-    const catSel = document.getElementById("inv-category");
-    const noteInp = document.getElementById("inv-note");
     const qtyInp = document.getElementById("inv-qty");
+    const catChecksEl = document.getElementById("inv-cat-checks");
+    const noteInp = document.getElementById("inv-note");
 
     oreSel.hidden = isGenericMode;
     oreSel.required = !isGenericMode;
-    catSel.hidden = !isGenericMode;
-    catSel.required = isGenericMode;
+    qtyInp.hidden = isGenericMode;
+    qtyInp.required = !isGenericMode;
+    catChecksEl.hidden = !isGenericMode;
     noteInp.hidden = !isGenericMode;
-
-    const unit = isGenericMode ? CATEGORY_UNIT[catSel.value] || "ud" : "SCU";
-    qtyInp.placeholder = `Cantidad (${unit})`;
   },
 
   isGeneric(entry) {
     return entry.category !== undefined;
+  },
+
+  // Distingue las dos variantes de entrada genérica (ver comentario de
+  // cabecera): comprobar esto en vez de `entry.qty` a pelo, porque `0` sería
+  // falsy pero sí es una cantidad real.
+  hasQty(entry) {
+    return entry.qty !== null && entry.qty !== undefined;
   },
 
   labelOf(entry) {
@@ -158,33 +184,40 @@ const Inventory = {
 
   add() {
     const isGenericMode = document.getElementById("inv-entry-type").value === "generic";
-    const qty = parseFloat(document.getElementById("inv-qty").value);
     const loc = document.getElementById("inv-loc").value;
-    if (!(qty > 0)) return;
 
     if (isGenericMode) {
-      const category = document.getElementById("inv-category").value;
-      if (!category) return;
+      // Una entrada por cada categoría marcada (sin cantidad SCU, ver
+      // comentario de cabecera), todas con la misma nota y fecha.
+      const checked = [...document.querySelectorAll('#inv-cat-checks input[type="checkbox"]:checked')];
+      if (!checked.length) return;
       const note = document.getElementById("inv-note").value.trim();
-      this.entries.push({
-        id: Date.now(),
-        category,
-        qty,
-        unit: CATEGORY_UNIT[category] || "ud",
-        loc,
-        note: note || null,
-        date: new Date().toISOString(),
+      const now = new Date().toISOString();
+      checked.forEach((box, i) => {
+        this.entries.push({
+          id: Date.now() + i, // +i: evita ids duplicados al crear varias entradas en el mismo ms
+          category: box.value,
+          qty: null,
+          unit: null,
+          loc,
+          note: note || null,
+          date: now,
+        });
+        box.checked = false;
+        box.closest(".inv-cat-check")?.classList.remove("checked");
       });
       document.getElementById("inv-note").value = "";
     } else {
+      const qty = parseFloat(document.getElementById("inv-qty").value);
+      if (!(qty > 0)) return;
       const ore = document.getElementById("inv-ore").value;
       if (!ore) return;
       this.entries.push({ id: Date.now(), ore, qty, loc, date: new Date().toISOString() });
+      document.getElementById("inv-qty").value = "";
     }
 
     this.save();
     this.render();
-    document.getElementById("inv-qty").value = "";
     showToast("Añadido al inventario");
   },
 
@@ -241,10 +274,14 @@ const Inventory = {
     }
 
     // Total SCU: minerales concretos + entradas genéricas de categoría
-    // "Minerales" (misma unidad); armas/armaduras/tarjetas/pinturas/otros se
-    // cuentan aparte porque van en unidades, no en SCU.
-    const scuEntries = this.entries.filter((e) => this.unitOf(e) === "SCU");
-    const genericOtherEntries = this.entries.filter((e) => this.isGeneric(e) && e.unit !== "SCU");
+    // "Minerales" con cantidad (misma unidad); armas/armaduras/tarjetas/
+    // pinturas/otros se cuentan aparte porque van en unidades, no en SCU.
+    // Las entradas genéricas "sin cantidad" (checkboxes múltiples, sin
+    // campo SCU) se excluyen de ambos totales y se cuentan aparte, igual
+    // que ya se hace con "sin valorar" para el precio.
+    const scuEntries = this.entries.filter((e) => this.hasQty(e) && this.unitOf(e) === "SCU");
+    const genericOtherEntries = this.entries.filter((e) => this.isGeneric(e) && this.hasQty(e) && e.unit !== "SCU");
+    const noQtyEntries = this.entries.filter((e) => !this.hasQty(e));
     const totalScu = scuEntries.reduce((s, e) => s + e.qty, 0);
     const totalValue = this.entries.reduce((s, e) => s + (this.valueOf(e) || 0), 0);
     const totalGenericUds = genericOtherEntries.reduce((s, e) => s + e.qty, 0);
@@ -253,7 +290,8 @@ const Inventory = {
       <div class="stat"><div class="label">Registros</div><div class="value">${this.entries.length}</div></div>
       <div class="stat"><div class="label">Total SCU</div><div class="value">${fmtNum(totalScu, 2)}</div></div>
       <div class="stat"><div class="label">Valor estimado (venta UEX)</div><div class="value accent">${fmtNum(totalValue)} aUEC</div></div>
-      ${genericOtherEntries.length ? `<div class="stat"><div class="label">Otros objetos (sin valorar)</div><div class="value">${fmtNum(totalGenericUds, 2)} ud</div></div>` : ""}`;
+      ${genericOtherEntries.length ? `<div class="stat"><div class="label">Otros objetos (sin valorar)</div><div class="value">${fmtNum(totalGenericUds, 2)} ud</div></div>` : ""}
+      ${noQtyEntries.length ? `<div class="stat"><div class="label">Materiales sin cantidad</div><div class="value">${noQtyEntries.length}</div></div>` : ""}`;
 
     list.innerHTML = this.groupBy === "loc" ? this.renderLocationBoxes() : this.renderMineralGroups();
 
@@ -277,26 +315,29 @@ const Inventory = {
     return Object.entries(groups)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([name, items]) => {
-        const scu = items.filter((e) => this.unitOf(e) === "SCU").reduce((s, e) => s + e.qty, 0);
+        const qtyItems = items.filter((e) => this.hasQty(e));
+        const scu = qtyItems.filter((e) => this.unitOf(e) === "SCU").reduce((s, e) => s + e.qty, 0);
         const val = items.reduce((s, e) => s + (this.valueOf(e) || 0), 0);
         const hasValuable = items.some((e) => !this.isGeneric(e));
         const oreEntry = items.find((e) => !this.isGeneric(e));
         const rows = items
           .map((e) => {
             const note = this.isGeneric(e) && e.note ? ` <span class="meta">· ${esc(e.note)}</span>` : "";
+            const qtyTxt = this.hasQty(e) ? `${fmtNum(e.qty, 2)} ${esc(this.unitOf(e))}` : "Sin cantidad";
             return `<div class="entry">
               <span>
                 ${esc(e.loc || "Sin ubicación")}${note}
                 <span class="meta"> · ${new Date(e.date).toLocaleDateString("es-ES")}</span>
               </span>
               <span>
-                ${fmtNum(e.qty, 2)} ${esc(this.unitOf(e))}
+                ${qtyTxt}
                 <button class="entry-del" data-id="${e.id}" title="Eliminar registro">✕</button>
               </span>
             </div>`;
           })
           .join("");
-        const totalsTxt = `${fmtNum(scu, 2)} SCU · ${hasValuable ? fmtNum(val) + " aUEC" : "sin valorar"}`;
+        const qtyTxt = qtyItems.length ? `${fmtNum(scu, 2)} SCU` : "sin cantidad";
+        const totalsTxt = `${qtyTxt} · ${hasValuable ? fmtNum(val) + " aUEC" : "sin valorar"}`;
         return `<div class="group">
           <div class="group-head">
             <span>${oreEntry ? rarityDotHtml(oreEntry.ore) : ""}${esc(name)}</span>
@@ -329,8 +370,10 @@ const Inventory = {
       .map((key) => {
         const items = boxes[key];
         const name = key || "Sin ubicación";
-        const scuItems = items.filter((e) => this.unitOf(e) === "SCU");
-        const otherUdItems = items.filter((e) => this.unitOf(e) !== "SCU");
+        const qtyItems = items.filter((e) => this.hasQty(e));
+        const scuItems = qtyItems.filter((e) => this.unitOf(e) === "SCU");
+        const otherUdItems = qtyItems.filter((e) => this.unitOf(e) !== "SCU");
+        const noQtyCount = items.length - qtyItems.length;
         const scu = scuItems.reduce((s, e) => s + e.qty, 0);
         const otherUd = otherUdItems.reduce((s, e) => s + e.qty, 0);
         const val = items.reduce((s, e) => s + (this.valueOf(e) || 0), 0);
@@ -345,17 +388,20 @@ const Inventory = {
         const subHtml = Object.entries(subgroups)
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([label, subItems]) => {
-            const subQty = subItems.reduce((s, e) => s + e.qty, 0);
+            const subQtyItems = subItems.filter((e) => this.hasQty(e));
+            const subQty = subQtyItems.reduce((s, e) => s + e.qty, 0);
             const subVal = subItems.reduce((s, e) => s + (this.valueOf(e) || 0), 0);
             const subValuable = subItems.some((e) => !this.isGeneric(e));
             const subOreEntry = subItems.find((e) => !this.isGeneric(e));
-            const unit = this.unitOf(subItems[0]);
+            const unit = this.unitOf(subQtyItems[0] || subItems[0]);
+            const subQtyTxt = subQtyItems.length ? `${fmtNum(subQty, 2)} ${esc(unit)}` : "sin cantidad";
             const rows = subItems
               .map((e) => {
                 const note = this.isGeneric(e) && e.note ? ` <span class="meta">· ${esc(e.note)}</span>` : "";
+                const qtyTxt = this.hasQty(e) ? `${fmtNum(e.qty, 2)} ${esc(this.unitOf(e))}` : "Sin cantidad";
                 return `<div class="entry">
                   <span>
-                    ${fmtNum(e.qty, 2)} ${esc(this.unitOf(e))}${note}
+                    ${qtyTxt}${note}
                     <span class="meta"> · ${new Date(e.date).toLocaleDateString("es-ES")}</span>
                   </span>
                   <span>
@@ -367,7 +413,7 @@ const Inventory = {
             return `<div class="inv-box-sub">
               <div class="inv-box-sub-head">
                 <span>${subOreEntry ? rarityDotHtml(subOreEntry.ore) : ""}${esc(label)}</span>
-                <span>${fmtNum(subQty, 2)} ${esc(unit)}${subValuable ? " · " + fmtNum(subVal) + " aUEC" : ""}</span>
+                <span>${subQtyTxt}${subValuable ? " · " + fmtNum(subVal) + " aUEC" : ""}</span>
               </div>
               ${rows}
             </div>`;
@@ -381,6 +427,7 @@ const Inventory = {
               <span>${items.length} obj.</span>
               ${scuItems.length ? `<span>${fmtNum(scu, 2)} SCU</span>` : ""}
               ${otherUdItems.length ? `<span>${fmtNum(otherUd, 2)} ud</span>` : ""}
+              ${noQtyCount ? `<span>${noQtyCount} sin cantidad</span>` : ""}
               <span class="accent">${hasValuable ? fmtNum(val) + " aUEC" : "sin valorar"}</span>
               <span class="inv-box-caret">${open ? "▾" : "▸"}</span>
             </span>
@@ -400,8 +447,8 @@ const Inventory = {
           type: "generic",
           category: e.category,
           category_name: CATEGORY_ES[e.category] || e.category,
-          qty: e.qty,
-          unit: this.unitOf(e),
+          qty: this.hasQty(e) ? e.qty : null,
+          unit: this.hasQty(e) ? this.unitOf(e) : null,
           note: e.note || null,
           location: e.loc || null,
           date: e.date,
@@ -430,8 +477,13 @@ const Inventory = {
     const genericGroups = {};
     for (const e of this.entries) {
       if (this.isGeneric(e)) {
-        const g = (genericGroups[e.category] ??= { qty: 0, notes: [] });
-        g.qty += e.qty;
+        const g = (genericGroups[e.category] ??= { qty: 0, hasQty: false, noQtyCount: 0, notes: [] });
+        if (this.hasQty(e)) {
+          g.qty += e.qty;
+          g.hasQty = true;
+        } else {
+          g.noQtyCount++;
+        }
         if (e.note) g.notes.push(e.note);
       } else {
         const name = DATA.ores[e.ore]?.display_name || e.ore;
@@ -451,11 +503,14 @@ const Inventory = {
       lines.push("", "**📦 Otros objetos (sin valorar)**");
       lines.push(
         ...genericEntries
-          .sort((a, b) => b[1].qty - a[1].qty)
+          .sort((a, b) => b[1].qty + b[1].noQtyCount - (a[1].qty + a[1].noQtyCount))
           .map(([cat, g]) => {
             const unit = CATEGORY_UNIT[cat] || "ud";
             const notesTxt = g.notes.length ? ` _(${g.notes.join(", ")})_` : "";
-            return `> ${CATEGORY_ES[cat] || cat}: **${fmtNum(g.qty, 2)} ${unit}**${notesTxt}`;
+            const parts = [];
+            if (g.hasQty) parts.push(`${fmtNum(g.qty, 2)} ${unit}`);
+            if (g.noQtyCount) parts.push(`${g.noQtyCount} sin cantidad`);
+            return `> ${CATEGORY_ES[cat] || cat}: **${parts.join(" + ")}**${notesTxt}`;
           })
       );
     }

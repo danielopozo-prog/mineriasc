@@ -53,6 +53,38 @@ function uexBaseName(rawName) {
     .toLowerCase();
 }
 
+// Correcciones puntuales al nombre de material tal como lo usa sc-craft.tools
+// (data/craft_blueprints.json, `ingredients[].name`) cuando NO coincide con
+// `ore.display_name` de mining_data.json — fuente y quirk distintos de
+// UEX_NAME_OVERRIDES (esa tabla es solo para la API de UEX; no reutilizar
+// aquí ni al revés). Los dos casos están verificados contra el JSON generado
+// en el parche 4.9 (36 nombres de material distintos vistos en los 1589
+// planos, comparados uno a uno con los 39 `display_name` de mining_data.json):
+//   - ALUMINUM: sc-craft usa la grafía americana "Aluminum"; mining_data.json
+//     trae la británica "Aluminium". Sin este override craftByMaterial no
+//     encuentra ningún plano para Aluminio pese a que sí los hay.
+//   - QUANTANIUM: sc-craft usa "Quantainium" (misma grafía que UEX real, ver
+//     UEX_NAME_OVERRIDES/comentario de uexRefinedFor); mining_data.json trae
+//     "Quantanium".
+// El resto de materiales que aparecen en ambas fuentes (33 de 36) coinciden
+// tal cual. Añadir aquí cualquier caso nuevo que aparezca tras regenerar
+// data/craft_blueprints.json — no tocar ese fichero a mano.
+const CRAFT_NAME_OVERRIDES = {
+  ALUMINUM: "Aluminum",
+  QUANTANIUM: "Quantainium",
+};
+
+// Nombre BASE de un material de sc-craft.tools: quita el único sufijo de "en
+// bruto" verificado en `ingredients[].name` de data/craft_blueprints.json —
+// "Saldynium (Ore)" es, en el parche 4.9, el único de los 36 nombres de
+// material con sufijo (el resto ya vienen "pelados"). Deliberadamente más
+// simple que uexBaseName (esa cubre 3 patrones distintos, verificados contra
+// la API de UEX): no se adivina un patrón de más aquí sin verificarlo primero
+// contra un data/craft_blueprints.json regenerado.
+function craftBaseName(rawName) {
+  return (rawName || "").replace(/\s*\(Ore\)\s*$/i, "").trim().toLowerCase();
+}
+
 const DATA = {
   raw: null,           // JSON completo
   ores: {},            // clave -> mineral
@@ -68,6 +100,7 @@ const DATA = {
   marketplaceByBase: {}, // nombre base normalizado (minúsculas) -> [fila averages, ...]
   marketplaceReady: false,
   uexLocations: [], // catálogo ampliado (ciudades/estaciones/outposts) de data/uex_locations.json
+  craft: { blueprints: [], byMaterial: {}, ready: false }, // data/craft_blueprints.json + índice material -> planos
   _refreshInFlight: null, // promesa del refreshLive() en curso, para deduplicar clicks
 
   async load() {
@@ -95,6 +128,21 @@ const DATA = {
     } catch (_) {
       this.uexLocations = [];
     }
+
+    // Catálogo de planos de crafteo, vendorizado desde sc-craft.tools (ver
+    // .claude/scripts/fetch_craft_blueprints.py y .claude/guides/datos-juego.md).
+    // Fichero LOCAL igual que mining_data.json/uex_locations.json (no depende
+    // de ninguna API en vivo): protegido igual, si falta o está corrupto
+    // craftBlueprints()/craftByMaterial() devuelven listas vacías sin romper
+    // el arranque.
+    try {
+      const craftRes = await fetch("data/craft_blueprints.json");
+      const craftJson = craftRes.ok ? await craftRes.json() : null;
+      this.craft.blueprints = (craftJson && craftJson.blueprints) || [];
+    } catch (_) {
+      this.craft.blueprints = [];
+    }
+    this.buildCraftIndex();
   },
 
   buildIndexes() {
@@ -132,6 +180,22 @@ const DATA = {
         this.oreRarity[sig.ore_hint] = sig.tier;
       }
     }
+  },
+
+  // Material (nombre base normalizado con craftBaseName) -> [{blueprint, ingredient}].
+  // Reconstruido cada `load()` a partir de `this.craft.blueprints` (ya cargado
+  // o vacío si data/craft_blueprints.json faltaba) — nunca deja el índice a
+  // medias: si blueprints es [], byMaterial queda {} y ready en false.
+  buildCraftIndex() {
+    this.craft.byMaterial = {};
+    for (const bp of this.craft.blueprints) {
+      for (const ing of bp.ingredients || []) {
+        const key = craftBaseName(ing.name);
+        if (!key) continue;
+        (this.craft.byMaterial[key] ??= []).push({ blueprint: bp, ingredient: ing });
+      }
+    }
+    this.craft.ready = this.craft.blueprints.length > 0;
   },
 
   // Precios UEX: se cargan aparte para que la app funcione aunque la API falle.
@@ -223,6 +287,42 @@ const DATA = {
     }
     rows.sort((a, b) => b.bonusPct - a.bonusPct);
     return rows.slice(0, limit);
+  },
+
+  // Catálogo completo de planos de crafteo (data/craft_blueprints.json, ~1589
+  // en el parche actual: nombre, categoría, tiempo, tiers, item_stats
+  // recortado, ingredientes completos con quality_effects, misiones). []
+  // (nunca null) si el fichero falta o no ha cargado todavía — comprobar
+  // `DATA.craft.ready` si la vista necesita distinguir "vacío de verdad" de
+  // "aún sin cargar", igual que `uexReady`/`marketplaceReady`.
+  craftBlueprints() {
+    return this.craft.blueprints;
+  },
+
+  // Planos que usan `oreKeyOrName` como ingrediente. Acepta:
+  //   - una clave de `DATA.ores` (p.ej. "QUANTANIUM", "ALUMINUM") — se
+  //     resuelve a CRAFT_NAME_OVERRIDES[clave] || ore.display_name, igual
+  //     patrón que uexFor/uexRefinedFor con UEX_NAME_OVERRIDES pero con la
+  //     tabla propia de esta fuente (sc-craft.tools tiene sus propias grafías,
+  //     no las de UEX — ver comentario de CRAFT_NAME_OVERRIDES);
+  //   - o un nombre de material libre (se normaliza igual, sin pasar por
+  //     `ores`), por si algún día hace falta consultar un ingrediente que no
+  //     es un mineral de mining_data.json (sc-craft.tools solo trae los 36
+  //     nombres de material reales vistos en el parche 4.9, todos minerales
+  //     de mining_data.json salvo "Pressurized Ice", que NO es el `ICE` de
+  //     minería — es otra commodity, no tiene entrada en `ores`).
+  //
+  // Devuelve [{blueprint, ingredient}] (nunca null): `blueprint` es la
+  // entrada completa de data/craft_blueprints.json (referencia, no copia);
+  // `ingredient` es la fila de `blueprint.ingredients` que hizo match
+  // (slot, quantity_scu, unit, min_quality, quality_effects). [] si no hay
+  // ningún plano, incluido el caso de que el fichero no haya cargado.
+  craftByMaterial(oreKeyOrName) {
+    const ore = this.ores[oreKeyOrName];
+    const rawName = ore
+      ? CRAFT_NAME_OVERRIDES[oreKeyOrName] || ore.display_name || oreKeyOrName
+      : oreKeyOrName;
+    return this.craft.byMaterial[craftBaseName(rawName)] || [];
   },
 
   // Medias del Marketplace P2P (jugador-a-jugador): se cargan aparte, igual que

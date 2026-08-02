@@ -106,10 +106,75 @@ def main():
     check("data.js: LOC_TYPE_ES cubre 'city' y 'outpost'",
           '"Ciudad"' in data_js_src and '"Puesto avanzado"' in data_js_src)
 
+    # --- catálogo de planos de crafteo (data/craft_blueprints.json) --------
+    # Vendorizado desde sc-craft.tools (script .claude/scripts/fetch_craft_blueprints.py),
+    # índice inverso material -> planos consumido por DATA.craftByMaterial() —
+    # ver .claude/guides/datos-juego.md.
+    craft_path = ROOT / "data" / "craft_blueprints.json"
+    try:
+        craft = json.loads(craft_path.read_text(encoding="utf-8"))
+        check("craft_blueprints.json parsea", True)
+        check("craft_blueprints.json tiene 'meta'", "meta" in craft and bool(craft["meta"]))
+        bps = craft.get("blueprints")
+        check("craft_blueprints.json tiene 'blueprints' no vacio", isinstance(bps, list) and bool(bps))
+        if isinstance(bps, list) and bps:
+            required_bp_keys = {"id", "blueprint_id", "name", "category", "craft_time_seconds",
+                                 "tiers", "ingredients", "missions"}
+            check("craft_blueprints.json: planos tienen las claves esperadas",
+                  all(required_bp_keys <= b.keys() for b in bps),
+                  "faltan claves en algun plano")
+            ing_sample = [i for b in bps for i in (b.get("ingredients") or [])]
+            check("craft_blueprints.json: hay ingredientes", bool(ing_sample))
+            required_ing_keys = {"slot", "name", "quantity_scu", "unit", "min_quality", "quality_effects"}
+            check("craft_blueprints.json: ingredientes tienen las claves esperadas",
+                  all(required_ing_keys <= i.keys() for i in ing_sample),
+                  "faltan claves en algun ingrediente")
+            # material real conocido (verificado en el parche 4.9, ver CRAFT_NAME_OVERRIDES
+            # en data.js): si esto desaparece, la fuente cambio de forma y hay que revisar.
+            ing_names = {i.get("name") for i in ing_sample}
+            check("craft_blueprints.json: incluye Quantainium (grafia real de sc-craft.tools)",
+                  "Quantainium" in ing_names)
+    except Exception as e:  # noqa: BLE001
+        check("craft_blueprints.json parsea", False, str(e))
+        craft = None
+
+    data_js_src_for_craft = (ROOT / "js" / "data.js").read_text(encoding="utf-8")
+    check("data.js: craftBlueprints() definido", "craftBlueprints()" in data_js_src_for_craft)
+    check("data.js: craftByMaterial definido", "craftByMaterial(oreKeyOrName)" in data_js_src_for_craft)
+    check("data.js: craft_blueprints.json se carga en load()",
+          "craft_blueprints.json" in data_js_src_for_craft)
+    check("data.js: CRAFT_NAME_OVERRIDES definido", "CRAFT_NAME_OVERRIDES" in data_js_src_for_craft)
+    for ore_key in ("ALUMINUM", "QUANTANIUM"):
+        check(f"data.js: CRAFT_NAME_OVERRIDES cubre {ore_key}",
+              re.search(rf"\b{ore_key}\s*:", data_js_src_for_craft) is not None)
+    check("data.js: craftBaseName definido", "function craftBaseName" in data_js_src_for_craft)
+    check("data.js: craftByMaterial usa craftBaseName",
+          re.search(r"craftByMaterial\(oreKeyOrName\)\s*\{[\s\S]{0,300}craftBaseName", data_js_src_for_craft)
+          is not None)
+
+    # --- pestaña "Crafteo" (busqueda inversa de blueprints por material) ---
+    craft_view_path = ROOT / "js" / "crafting.js"
+    check("js/crafting.js existe", craft_view_path.exists())
+    if craft_view_path.exists():
+        craft_view_src = craft_view_path.read_text(encoding="utf-8")
+        check("crafting.js: usa SearchSelect.enhance para el selector de material",
+              "SearchSelect.enhance" in craft_view_src)
+        check("crafting.js: interpolacion de calidad respeta 'ranges' (tramos no lineales)",
+              ".ranges" in craft_view_src)
+        check("crafting.js: fmtCraftQty distingue unit 'unit' (ud) de 'scu' (SCU/cSCU)",
+              '"unit"' in craft_view_src and "cSCU" in craft_view_src)
+        check("crafting.js: degrada con mensaje si DATA.craft no cargo (no rompe)",
+              "DATA.craft.ready" in craft_view_src)
+    app_js_src = (ROOT / "js" / "app.js").read_text(encoding="utf-8")
+    check("app.js: Crafting.init() llamado", "Crafting.init()" in app_js_src)
+
     # --- multipagina: cada pagina de nivel superior ("hoja" de una app) se
     # valida por separado (scripts, ids), pero js/ y el gate global siguen
     # siendo uno solo. Anadir una pagina nueva = anadirla a este dict.
     html = (ROOT / "index.html").read_text(encoding="utf-8")
+    check("index.html: pestana Crafteo enlazada (tab + seccion)",
+          'data-tab="crafteo"' in html and 'id="tab-crafteo"' in html)
+    check("index.html: credito de blueprints a sc-craft.tools", "sc-craft.tools" in html)
     pages = {"index.html": html}
     contadores_path = ROOT / "contadores.html"
     if contadores_path.exists():

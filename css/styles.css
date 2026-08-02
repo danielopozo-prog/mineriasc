@@ -231,9 +231,14 @@ input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(
 }
 .ssel.disabled .ssel-trigger { opacity: 0.5; cursor: not-allowed; }
 .ssel-trigger-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ssel-trigger-label.placeholder { color: var(--text-dim); }
+/* ssel-placeholder-value, NO "placeholder": esa clase ya existe global (línea
+   ~392, mensajes de estado vacío con padding: 60px 20px) — nombrar igual la
+   colisionaba y disparaba la regresión de altura del formulario (ver
+   arquitectura.md). */
+.ssel-trigger-label.ssel-placeholder-value { color: var(--text-dim); }
 .ssel-caret { color: var(--text-dim); font-size: 0.75rem; flex-shrink: 0; }
 
+.ssel-panel[hidden] { display: none; } /* misma trampa que .split[hidden]: una regla de autor con display: flex de abajo, si no se restringe con [hidden], gana siempre al display:none del user-agent y el panel quedaría "abierto" permanentemente */
 .ssel-panel {
   position: absolute;
   top: calc(100% + 4px);
@@ -532,6 +537,41 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
 .card .row { display: flex; justify-content: space-between; font-size: 0.8rem; padding: 2px 0; color: var(--text-dim); }
 .card .row b { color: var(--text); }
 
+/* ---------- Crafteo ---------- */
+/* Meta del lado derecho de cada .side-item (cantidad del material + tiempo
+   de fabricación, en 2 líneas): alineado a la derecha, a juego con el resto
+   de metadatos ".sub" de los que hereda color/tamaño. */
+.craft-side-meta { text-align: right; }
+.craft-quality-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 16px;
+}
+.craft-quality-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.craft-quality-value {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 3.5ch;
+  text-align: right;
+}
+/* Especificidad reforzada (0,2,1) a propósito: sin ella, ".card h5" (0,1,1)
+   le impondría mayúsculas y el color de acento al slot entre paréntesis,
+   perdiendo el contraste "nombre del material (destacado) / slot (discreto)"
+   que se busca aquí. */
+.card h5 .craft-slot-tag {
+  color: var(--text-dim);
+  text-transform: none;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+.craft-credit { text-align: right; margin-top: 10px; }
+
 /* ---------- Buttons ---------- */
 .btn {
   display: inline-block;
@@ -576,6 +616,36 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
   padding: 14px;
 }
 .inv-form select, .inv-form input { flex: 1; min-width: 160px; }
+
+/* Modo "Materiales genéricos": tira de categorías con checkbox (selección
+   múltiple) en vez del <select> de categoría + campo SCU retirados. Ocupa
+   la fila entera (flex-basis 100%) porque son varias píldoras, no un solo
+   control. [hidden] explícito: sin él, el display:flex de abajo (regla de
+   autor) gana siempre al display:none del user-agent — misma trampa que
+   .ssel-panel/.split, ver comentarios junto a esas reglas. */
+.inv-cat-checks[hidden] { display: none; }
+.inv-cat-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1 1 100%;
+}
+.inv-cat-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  user-select: none;
+}
+.inv-cat-check:hover { border-color: var(--border-strong); }
+.inv-cat-check.checked { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.inv-cat-check input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 
 .inv-summary {
   display: grid;

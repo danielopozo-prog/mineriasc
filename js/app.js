@@ -47,6 +47,7 @@
   Locations.init();
   Inventory.init();
   Signals.init();
+  Crafting.init();
 
   // Precios en vivo, sin bloquear la interfaz
   try {
