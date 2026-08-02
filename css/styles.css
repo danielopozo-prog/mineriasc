@@ -607,7 +607,7 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
 }
 #craft-list .craft-section-name {
   font-family: var(--font-ui);
-  font-size: 0.82rem;
+  font-size: 0.95rem;
   font-weight: 600;
   text-transform: none;
   letter-spacing: normal;
