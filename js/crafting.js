@@ -56,6 +56,77 @@ function fmtQualityEffectValue(qe, value) {
     : `${value > 0 ? "+" : ""}${fmtNum(value, 2)}`;
 }
 
+// Tramos de `category` ("Vehiclegear / Weapons / Ballistic / Cannon", ver
+// datos-juego.md), separados y sin espacios sueltos. Robusto a que el JSON
+// venga con o sin espacio alrededor de "/".
+function craftCategoryParts(category) {
+  return (category || "").split("/").map((s) => s.trim()).filter(Boolean);
+}
+
+// Sección de la lista de objetos crafteables, agrupando por categoría (ver
+// Crafting.renderList). Verificado contra los 1589 planos del parche actual
+// (python -c sobre data/craft_blueprints.json, no una muestra): solo 4
+// categorías de primer nivel — Armour (915), Vehiclegear (464), Weapons
+// (174), Ammo (36) — muy desiguales en tamaño y, las dos grandes, muy
+// heterogéneas (Armour cubre desde armadura de combate hasta trajes de
+// minero; Vehiclegear cubre desde refrigeración hasta escudos de nave, sin
+// relación entre sí). Por eso el nivel de agrupación NO es uniforme:
+//   - Armour y Vehiclegear se parten por su 2º nivel (14 y 10 subtipos
+//     respectivamente — Combat/Engineer/Hunter…, Cooler/Powerplant/Shield…):
+//     son los dos "paraguas" demasiado grandes y dispares para una sola
+//     sección (más de la mitad del catálogo entre las dos).
+//   - Weapons y Ammo se quedan en su nivel 1: ya son conceptos coherentes y
+//     razonablemente compactos (174 y 36 planos) — partirlos por tipo de
+//     arma/munición fragmentaría de más sin aportar claridad.
+// Resultado: 26 secciones GLOBALES posibles (2 + 14 + 10), pero para
+// cualquier material concreto solo aparecen las que de verdad tienen algún
+// objeto — de 2 (p.ej. Pressurized Ice) a ~12 (p.ej. Iron) en la práctica,
+// nunca las 26 a la vez.
+function craftSectionKey(category) {
+  const parts = craftCategoryParts(category);
+  const top = parts[0] || "";
+  if ((top === "Armour" || top === "Vehiclegear") && parts[1]) {
+    return `${top}/${parts[1]}`;
+  }
+  return top || "(sin categoría)";
+}
+
+// Traducción de cada sección (ver craftSectionKey de arriba). Un término sin
+// entrada aquí (parche futuro con una subcategoría nueva) se muestra tal
+// cual en vez de romper — ver el fallback en craftSectionLabel.
+const CRAFT_SECTION_ES = {
+  Weapons: "Armas",
+  Ammo: "Munición",
+  "Armour/Combat": "Armadura de combate",
+  "Armour/Engineer": "Armadura de ingeniero",
+  "Armour/Hunter": "Armadura de cazador",
+  "Armour/Stealth": "Armadura sigilosa",
+  "Armour/Miner": "Armadura de minero",
+  "Armour/Undersuit": "Ropa interior (undersuit)",
+  "Armour/Flightsuit": "Traje de vuelo",
+  "Armour/Explorer": "Armadura de explorador",
+  "Armour/Environment": "Armadura ambiental",
+  "Armour/Cosmonaut": "Traje de cosmonauta",
+  "Armour/Medic": "Armadura médica",
+  "Armour/Salvager": "Armadura de reciclaje",
+  "Armour/Radiation": "Armadura antirradiación",
+  "Armour/Racer": "Armadura de piloto de carreras",
+  "Vehiclegear/Weapons": "Armamento de nave",
+  "Vehiclegear/Cooler": "Refrigeración de nave",
+  "Vehiclegear/Powerplant": "Planta de energía",
+  "Vehiclegear/Shield": "Escudos de nave",
+  "Vehiclegear/Radar": "Radar y contramedidas",
+  "Vehiclegear/Quantumdrive": "Motor cuántico",
+  "Vehiclegear/Mininglaser": "Láser de minería (nave)",
+  "Vehiclegear/Tractorbeam": "Rayo tractor",
+  "Vehiclegear/Refuelling": "Repostaje",
+  "Vehiclegear/Salvage": "Reciclaje de nave",
+};
+
+function craftSectionLabel(key) {
+  return CRAFT_SECTION_ES[key] || key.split("/").join(" · ");
+}
+
 const Crafting = {
   selectedMaterial: null, // rawName tal cual aparece en ingredients[].name, o null
   selectedBlueprintId: null,
@@ -154,15 +225,42 @@ const Crafting = {
       return;
     }
 
-    listEl.innerHTML = this.items
-      .map(({ blueprint, qty, unit, mixedUnit }) => {
-        const catLeaf = (blueprint.category || "").split(" / ").filter(Boolean).pop() || "";
-        const qtyTxt = mixedUnit ? "varias unidades" : fmtCraftQty(qty, unit);
-        const timeTxt = fmtCraftTime(blueprint.craft_time_seconds);
-        return `<div class="side-item ${blueprint.id === this.selectedBlueprintId ? "active" : ""}" data-id="${blueprint.id}">
-          <span class="side-item-name">${esc(blueprint.name)}<br><span class="sub">${esc(catLeaf)}</span></span>
-          <span class="sub craft-side-meta">${esc(qtyTxt)}<br>${esc(timeTxt)}</span>
-        </div>`;
+    // Agrupar por sección de categoría (ver craftSectionKey/CRAFT_SECTION_ES
+    // arriba): el orden ascendente por cantidad de this.items se conserva
+    // DENTRO de cada sección (Map conserva orden de inserción). Las secciones
+    // se ordenan de más a menos objetos — la más relevante para este
+    // material primero — y a empate, alfabéticamente por su etiqueta.
+    const sections = new Map(); // key -> { label, rows: [] }
+    for (const row of this.items) {
+      const key = craftSectionKey(row.blueprint.category);
+      let sec = sections.get(key);
+      if (!sec) {
+        sec = { label: craftSectionLabel(key), rows: [] };
+        sections.set(key, sec);
+      }
+      sec.rows.push(row);
+    }
+    const orderedSections = [...sections.values()].sort(
+      (a, b) => b.rows.length - a.rows.length || a.label.localeCompare(b.label)
+    );
+
+    listEl.innerHTML = orderedSections
+      .map((sec) => {
+        const head = `<div class="side-group-head">${esc(sec.label)} · ${sec.rows.length} objeto${
+          sec.rows.length === 1 ? "" : "s"
+        }</div>`;
+        const rows = sec.rows
+          .map(({ blueprint, qty, unit, mixedUnit }) => {
+            const catLeaf = craftCategoryParts(blueprint.category).pop() || "";
+            const qtyTxt = mixedUnit ? "varias unidades" : fmtCraftQty(qty, unit);
+            const timeTxt = fmtCraftTime(blueprint.craft_time_seconds);
+            return `<div class="side-item ${blueprint.id === this.selectedBlueprintId ? "active" : ""}" data-id="${blueprint.id}">
+              <span class="side-item-name">${esc(blueprint.name)}<br><span class="sub">${esc(catLeaf)}</span></span>
+              <span class="sub craft-side-meta">${esc(qtyTxt)}<br>${esc(timeTxt)}</span>
+            </div>`;
+          })
+          .join("");
+        return head + rows;
       })
       .join("");
 
@@ -186,7 +284,7 @@ const Crafting = {
     }
 
     const timeTxt = fmtCraftTime(bp.craft_time_seconds);
-    const catTxt = (bp.category || "").split(" / ").filter(Boolean).join(" › ");
+    const catTxt = craftCategoryParts(bp.category).join(" › ");
     const massTxt =
       bp.item_stats && bp.item_stats.mass_kg != null ? `${fmtNum(bp.item_stats.mass_kg, 2)} kg` : null;
     const ingredients = bp.ingredients || [];

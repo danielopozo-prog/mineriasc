@@ -165,8 +165,22 @@ def main():
               '"unit"' in craft_view_src and "cSCU" in craft_view_src)
         check("crafting.js: degrada con mensaje si DATA.craft no cargo (no rompe)",
               "DATA.craft.ready" in craft_view_src)
+        check("crafting.js: lista de objetos agrupada por seccion de categoria",
+              "craftSectionKey" in craft_view_src and "CRAFT_SECTION_ES" in craft_view_src)
+        check("crafting.js: craftSectionLabel degrada sin romper ante categorias sin traducir",
+              re.search(r"craftSectionLabel\(key\)\s*\{[\s\S]{0,150}\|\|", craft_view_src) is not None)
     app_js_src = (ROOT / "js" / "app.js").read_text(encoding="utf-8")
     check("app.js: Crafting.init() llamado", "Crafting.init()" in app_js_src)
+    # Si sc-craft.tools reorganiza las categorias de primer nivel en un parche
+    # futuro, craftSectionLabel() no rompe (fallback ya cubierto arriba) pero
+    # el mapeo CRAFT_SECTION_ES quedaria incompleto en silencio (secciones sin
+    # traducir) — este check avisa explicitamente si aparece una categoria de
+    # primer nivel nueva, para que alguien revise el mapeo a proposito.
+    if craft is not None:
+        top_cats = {(b.get("category") or "").split("/")[0].strip() for b in craft.get("blueprints", [])}
+        known_top_cats = {"Armour", "Vehiclegear", "Weapons", "Ammo"}
+        check("craft_blueprints.json: categorias de primer nivel conocidas (revisar CRAFT_SECTION_ES si cambian)",
+              top_cats <= known_top_cats, f"nuevas: {sorted(top_cats - known_top_cats)}")
 
     # --- multipagina: cada pagina de nivel superior ("hoja" de una app) se
     # valida por separado (scripts, ids), pero js/ y el gate global siguen
