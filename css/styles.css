@@ -130,6 +130,29 @@ body {
   flex-direction: column;
 }
 
+/* ---------- Scrollbars (Firefox: scrollbar-color; Chromium/WebKit: pseudo-elements) ----------
+   Finas y oscuras en toda la app: track casi negro (--bg-alt), thumb en el
+   mismo ladrillo que --border-muted, algo más claro al pasar el ratón. Un
+   único bloque con selector universal (en vez de repetir por cada clase con
+   overflow propio: side-list, craft-materials-list, ssel-panel/ssel-options,
+   table-wrap, sig-loc-matrix-wrap, acordeones...) para que cubra tanto el
+   documento como cualquier contenedor con scroll interno presente o futuro.
+   color-scheme: dark en el mismo bloque (mismo elemento, <html>): sin esto
+   los controles nativos que la app no reestiliza a mano (checkbox unchecked,
+   menú desplegado de <select>, barra de scroll por defecto en navegadores
+   que ignoran scrollbar-color) caían al tema claro del SO y quedaban en
+   blanco puro, que es justo el defecto reportado. */
+html {
+  color-scheme: dark;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-muted) var(--bg-alt);
+}
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-track { background: var(--bg-alt); }
+*::-webkit-scrollbar-thumb { background: var(--border-muted); border-radius: var(--radius-sm); }
+*::-webkit-scrollbar-thumb:hover { background: var(--accent-2); }
+*::-webkit-scrollbar-corner { background: var(--bg-alt); }
+
 /* ---------- Kicker (etiqueta pequeña estilo "STAR CITIZEN · ...") ---------- */
 .kicker {
   display: block;
@@ -259,7 +282,13 @@ main { flex: 1; padding: 20px 24px; max-width: 1600px; width: 100%; margin: 0 au
 }
 .hint { color: var(--text-dim); font-size: 0.8rem; }
 
-input[type="search"], input[type="number"], select {
+/* input[type="text"] va en esta lista a propósito: sin él (regresión real,
+   detectada por captura) #inv-note y #sig-reverse-input, los dos únicos
+   campos de texto libre de la app, no heredaban ningún estilo y quedaban con
+   el recuadro en blanco puro del user-agent — el resto de inputs (search,
+   number) y los <select> sí estaban cubiertos. textarea añadido por si se
+   usa en el futuro (hoy no hay ninguno). */
+input[type="search"], input[type="number"], input[type="text"], textarea, select {
   background: var(--panel);
   border: 1px solid var(--border-muted);
   color: var(--text);
@@ -269,7 +298,13 @@ input[type="search"], input[type="number"], select {
   font-size: 0.9rem;
   min-width: 220px;
 }
-input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+input:focus, textarea:focus, select:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+input::placeholder, textarea::placeholder { color: var(--text-dim); opacity: 0.85; }
+/* Checkboxes (hoy solo .inv-cat-check, categorías de Inventario): accent-color
+   ya tiñe el relleno marcado del acento de marca; sin color-scheme:dark (ver
+   bloque de scrollbars más arriba) el cuadro SIN marcar caía al blanco del
+   tema claro del SO en vez de al gris oscuro nativo que da color-scheme. */
+input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 
 /* ---------- Combo con buscador (js/searchselect.js) ----------
    Envuelve un <select> largo (6+ opciones): el <select> original queda

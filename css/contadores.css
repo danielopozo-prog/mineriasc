@@ -119,7 +119,22 @@
 /* .btn usa display:inline-flex, que gana al display:none del navegador para
    [hidden]. Sin esto los botones ocultos se seguirían viendo. */
 [hidden]{display:none!important}
-html{scroll-behavior:smooth;scroll-padding-top:124px}
+/* color-scheme:dark (mismo motivo que css/styles.css, ver su comentario
+   junto al :root): sin esto los checkbox sin marcar de Ajustes (#setSound,
+   #setNotify) y la barra de scroll por defecto del documento caían al tema
+   claro del SO. Scrollbar global fina y oscura a juego con --line/--bg;
+   .hud__list/.viewnav/.dlg__body ya traían su propia versión (más arriba en
+   la cascada por especificidad de clase, así que se conservan tal cual, con
+   su acento en --accent en vez de --line). */
+html{
+  scroll-behavior:smooth;scroll-padding-top:124px;
+  color-scheme:dark;
+  scrollbar-width:thin;scrollbar-color:var(--line) var(--bg);
+}
+*::-webkit-scrollbar{width:9px;height:9px}
+*::-webkit-scrollbar-track{background:var(--bg)}
+*::-webkit-scrollbar-thumb{background:var(--line)}
+*::-webkit-scrollbar-thumb:hover{background:var(--accent-2)}
 body{
   margin:0;
   background:var(--bg);
