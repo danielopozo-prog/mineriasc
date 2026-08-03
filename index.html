@@ -28,6 +28,7 @@
         <button class="tab" data-tab="inventario">Inventario</button>
         <button class="tab" data-tab="senales">Señales</button>
         <button class="tab" data-tab="crafteo">Crafteo</button>
+        <button class="tab" data-tab="misiones">Misiones</button>
       </nav>
       <a href="contadores.html" class="btn small" title="Temporizadores del Hangar Ejecutivo, impresoras, loot y Compboards">⏱ Contadores</a>
     </div>
@@ -172,13 +173,22 @@
       </div>
       <div class="craft-layout">
         <div class="craft-materials-panel">
-          <div class="panel-head-actions craft-materials-head">
+          <div class="btn-row craft-mode-switch">
+            <button type="button" id="craft-mode-materials" class="btn small active">Materiales</button>
+            <button type="button" id="craft-mode-objects" class="btn small">Objetos</button>
+          </div>
+          <div class="panel-head-actions craft-materials-head" id="craft-materials-controls">
             <input type="search" id="craft-material-search" placeholder="Busca un material… (ej. Iron)" autocomplete="off">
             <select id="craft-material-sort" title="Ordenar por">
               <option value="name">Nombre (A-Z)</option>
               <option value="count">Nº de objetos</option>
               <option value="rarity">Rareza</option>
             </select>
+          </div>
+          <div class="panel-head-actions craft-materials-head" id="craft-objects-controls" hidden>
+            <input type="search" id="craft-object-search" placeholder="Busca un objeto… (ej. Sniper)" autocomplete="off">
+            <select id="craft-object-category" title="Categoría"></select>
+            <select id="craft-object-subtype" title="Subtipo" hidden></select>
           </div>
           <aside id="craft-materials" class="side-list craft-materials-list"></aside>
         </div>
@@ -197,6 +207,54 @@
       </div>
       <p class="hint craft-credit">Datos de blueprints: sc-craft.tools</p>
     </section>
+
+    <!-- ============ MISIONES ============ -->
+    <section id="tab-misiones" class="tab-panel">
+      <div class="panel-head">
+        <div class="head-title">
+          <span class="kicker">Star Citizen · Contratos</span>
+          <h2>Misiones</h2>
+        </div>
+        <div class="panel-head-actions">
+          <input type="search" id="mission-search" placeholder="Busca una misión… (ej. VIP)" autocomplete="off">
+          <select id="mission-sort" title="Ordenar por">
+            <option value="reward">Recompensa (UEC)</option>
+            <option value="title">Título (A-Z)</option>
+            <option value="faction">Facción (A-Z)</option>
+          </select>
+        </div>
+      </div>
+      <div id="mission-filters" class="mission-filters">
+        <div class="filter-row" id="mission-category-filter"></div>
+        <div class="filter-row" id="mission-system-filter"></div>
+        <div class="mission-filters-row">
+          <select id="mission-type-filter"></select>
+          <select id="mission-faction-filter"></select>
+        </div>
+        <div class="mission-filters-row">
+          <div class="filter-row" id="mission-legal-filter"></div>
+          <div class="filter-row" id="mission-shareable-filter"></div>
+          <div class="filter-row" id="mission-availability-filter"></div>
+        </div>
+        <div class="mission-filters-row">
+          <label class="inv-cat-check"><input type="checkbox" id="mission-blueprint-only"><span>Solo con recompensa de plano</span></label>
+          <label class="mission-reward-range">
+            Recompensa UEC:
+            <input type="number" id="mission-reward-min" min="0" step="1000" placeholder="Mín">
+            <span>–</span>
+            <input type="number" id="mission-reward-max" min="0" step="1000" placeholder="Máx">
+          </label>
+          <button type="button" id="mission-filters-clear" class="btn small">Limpiar filtros</button>
+        </div>
+      </div>
+      <p class="hint" id="mission-count-hint"></p>
+      <div class="split" id="mission-split">
+        <aside id="mission-list" class="side-list"></aside>
+        <div id="mission-detail" class="detail">
+          <p class="placeholder">Selecciona una misión para ver su ficha completa.</p>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer>
@@ -213,6 +271,7 @@
   <script src="js/refinery.js"></script>
   <script src="js/inventory.js"></script>
   <script src="js/signals.js"></script>
+  <script src="js/missions.js"></script>
   <script src="js/crafting.js"></script>
   <script src="js/app.js"></script>
 </body>

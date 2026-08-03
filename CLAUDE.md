@@ -4,16 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # MINERÍA SC — instrucciones del proyecto
 
-Web app de minería para **Star Citizen** inspirada en Strata: buscador de minerales,
-explorador de ubicaciones (Stanton/Pyro/Nyx), panel de refinería, inventario personal,
-señales de escáner y crafteo (búsqueda inversa de blueprints por material, con
-simulador de calidad) — 6 pestañas en total. Sitio 100 % estático — HTML + CSS + JS
-vanilla, **sin build, sin frameworks, sin backend**. Datos de juego en
+Web app de minería para **Star Citizen** inspirada en Strata: buscador de minerales, explorador de
+ubicaciones (Stanton/Pyro/Nyx), panel de refinería, inventario personal, señales de escáner, crafteo
+(búsqueda inversa de blueprints por material, con simulador de calidad) y misiones (filtros y ficha
+estilo scmdb.net, con recompensas de plano cruzadas) — 7 pestañas en total. Sitio 100 % estático —
+HTML + CSS + JS vanilla, **sin build, sin frameworks, sin backend**. Datos de juego en
 `data/mining_data.json` (base Strata), `data/uex_locations.json` (catálogo de
-estaciones/ciudades/outposts UEX) y `data/craft_blueprints.json` (planos de
-fabricación, sc-craft.tools) — los tres datos generados; precios en vivo de la API
-pública de UEX Corp llamada desde el navegador; inventario del usuario solo en
-`localStorage`. Idioma del producto y de la comunicación: **español**.
+estaciones/ciudades/outposts UEX), `data/craft_blueprints.json` (planos de fabricación,
+sc-craft.tools) y `data/missions.json` (catálogo de misiones, scmdb.net) — los cuatro
+datos generados; precios en vivo de la API pública de UEX Corp llamada desde el navegador;
+inventario del usuario solo en `localStorage`. Idioma del producto y de la comunicación: **español**.
 
 Tier del proyecto: **mínimo** — 2 dominios, sin subespecialistas, sin transversales, sin
 segunda plataforma. Toda la capa de agentes vive en `.claude/`.
@@ -33,6 +33,7 @@ python .claude/scripts/gate.py -v                                           # ve
 python .claude/scripts/browser_check.py --path /index.html                  # verificación real en navegador (--width/--height); ver arquitectura.md
 python .claude/scripts/fetch_uex_locations.py                               # regenerar data/uex_locations.json tras parche
 python .claude/scripts/fetch_craft_blueprints.py                            # regenerar data/craft_blueprints.json tras parche
+python .claude/scripts/fetch_missions.py                                    # regenerar data/missions.json tras parche
 curl -o data/mining_data.json https://seeknd.github.io/Strata/data/mining_data.json   # regenerar data/mining_data.json tras parche
 ```
 
@@ -88,7 +89,7 @@ Sin historial conversacional. Si falta contexto, una línea extra: `Contexto min
 
 | Zona | Agente | Dominio |
 |---|---|---|
-| `index.html`, `css/styles.css`, `assets/`, `js/finder.js`, `js/locations.js`, `js/refinery.js`, `js/inventory.js`, `js/signals.js`, `js/crafting.js`, `js/searchselect.js`, `js/app.js` | `web-ui` | Las 6 pestañas, marcado, estilos, tipografía vendorizada, combos con buscador, render, interacción, exportaciones |
+| `index.html`, `css/styles.css`, `assets/`, `js/finder.js`, `js/locations.js`, `js/refinery.js`, `js/inventory.js`, `js/signals.js`, `js/missions.js`, `js/crafting.js`, `js/searchselect.js`, `js/app.js` | `web-ui` | Las 7 pestañas, marcado, estilos, tipografía vendorizada, combos con buscador, render, interacción, exportaciones |
 | `contadores.html`, `css/contadores.css`, `js/contadores.js` | `web-ui` | Página hermana de temporizadores SC (Hangar Ejecutivo, impresoras, loot, Compboards), enlazada desde la cabecera; localStorage propio (`pyro-ops-v1`), sin cruce con `mineriasc_*` |
 | `data/`, `js/data.js`, `js/uex.js` | `datos-uex` | mining_data.json, índices, cliente UEX, resolución de precios |
 | `README.md`, `CLAUDE.md`, `.claude/` | `web-ui` (docs de producto) / Tech Lead (capa de agentes, editada vía delegación a quien corresponda) | Documentación |
@@ -110,10 +111,10 @@ Reglas duras que vigila (romper una exige actualizar gate y guía en el mismo ca
 
 - **Estático puro**: sin package.json, sin CDNs, sin frameworks, sin backend. Debe poder
   desplegarse en GitHub Pages tal cual.
-- `data/mining_data.json`, `data/uex_locations.json` y `data/craft_blueprints.json`
-  son **datos generados**: se regeneran (Strata / `fetch_uex_locations.py` /
-  `fetch_craft_blueprints.py`), nunca se editan a mano, y deben conservar las claves
-  que la app consume.
+- `data/mining_data.json`, `data/uex_locations.json`, `data/craft_blueprints.json` y
+  `data/missions.json` son **datos generados**: se regeneran (Strata /
+  `fetch_uex_locations.py` / `fetch_craft_blueprints.py` / `fetch_missions.py`), nunca
+  se editan a mano, y deben conservar las claves que la app consume.
 - Todo `<script src>` de index.html existe, todo archivo de `js/` está referenciado, y
   todo `id` consultado por JS existe en el HTML (o lo genera otro módulo).
 - La app funciona sin la API de UEX: datos de juego primero, precios después, nunca
@@ -127,18 +128,18 @@ invariante que el gate no comprueba, no está terminado.
 
 Orden de carga de globales: `UEX` → `DATA` (+ utilidades `esc`/`fmtNum`/diccionarios) →
 `SearchSelect` (combo con buscador reutilizable) → vistas (`Finder`, `Locations`,
-`Refinery`, `Inventory`, `Signals`, `Crafting`) → `app.js` (arranque). La trampa
+`Refinery`, `Inventory`, `Signals`, `Missions`, `Crafting`) → `app.js` (arranque). La trampa
 de precios UEX (bruto con precio medio 0, sufijos « (Ore)»/« (Raw)», grafía
 Quantanium/Quantainium) está resuelta en `DATA.bestSellFor`/`uexRefinedFor` — detalle en
 `.claude/guides/uex-api.md`, que también cubre el marketplace P2P y los overrides de
 nombres. Estructura del JSON y su actualización: `.claude/guides/datos-juego.md`.
 Módulos y flujo: `.claude/guides/arquitectura.md`.
 
-Buscador, Ubicaciones y Crafteo tienen listas ordenables (precio/rareza/cantidad
-según la vista) que persisten el criterio en `localStorage` (`mineriasc_*_sort`).
-Crafteo usa una lista de materiales siempre visible, no un combo: reordenar un
-combo cerrado no se notaba (feedback real de uso) — detalle en
-`.claude/guides/arquitectura.md`.
+Buscador, Ubicaciones, Crafteo y Misiones tienen listas ordenables (precio/rareza/
+cantidad/recompensa según la vista) que persisten el criterio en `localStorage`
+(`mineriasc_*_sort`, p.ej. `mineriasc_missions_sort`). Crafteo usa una lista de
+materiales siempre visible, no un combo: reordenar un combo cerrado no se notaba
+(feedback real de uso) — detalle en `.claude/guides/arquitectura.md`.
 
 ## Cierre de build (reducido, tier mínimo)
 

@@ -609,6 +609,11 @@ button.side-group-head:hover { background: var(--panel-hover); }
 .pill.tier-rare { border-color: var(--info); color: var(--info); }
 .pill.tier-uncommon { border-color: var(--good); color: var(--good); }
 .pill.tier-common { color: var(--text-dim); }
+/* Legalidad de una misión (Misiones, ficha) — mismo patrón de pill con
+   borde/texto coloreados que .pill.tier-*, sin reutilizar esas clases
+   porque la semántica es distinta (legal/ilegal, no rareza). */
+.pill.legal-ok { border-color: var(--good); color: var(--good); }
+.pill.legal-bad { border-color: var(--bad); color: var(--bad); }
 
 /* ---------- Rareza de mineral (DATA.rarityFor): badge y punto de color ----------
    Mismos tonos que los .pill.tier-* de señal de escáner (común apagado ->
@@ -715,6 +720,7 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
 }
 @media (max-width: 800px) { .craft-layout { grid-template-columns: 1fr; } }
 .craft-materials-panel { display: flex; flex-direction: column; gap: 10px; }
+.craft-mode-switch .btn.small { flex: 1; text-align: center; }
 /* Buscador + orden apilados en vertical dentro de una columna estrecha: el
    flex-row de .panel-head-actions no tiene sitio para 2 controles de
    min-width 220px en 260px de columna — aquí SÍ tiene que ir en columna. */
@@ -723,6 +729,14 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
 .craft-materials-head select {
   min-width: 0;
   width: 100%;
+}
+/* [hidden] explícito en los dos bloques de controles (materiales/objetos,
+   ver #craft-mode-materials/#craft-mode-objects en js/crafting.js): sin él
+   el display:flex de la regla de arriba (autor) gana siempre al display:none
+   del user-agent — misma trampa que .split[hidden]/.ssel-panel[hidden]. */
+#craft-materials-controls[hidden],
+#craft-objects-controls[hidden] {
+  display: none;
 }
 .craft-materials-list { max-height: 75vh; }
 
@@ -1514,4 +1528,41 @@ footer a { color: var(--info); text-decoration: none; }
 @media (min-width: 1100px) {
   .sig-loc-matrix { min-width: 0; }
   .sig-loc-cell { font-size: 1.35rem; }
+}
+
+/* ---------- Misiones ---------- */
+/* Panel de filtros (#mission-filters): varias filas de controles apiladas —
+   2 filas de chips (.filter-row, ya existente: categoría, sistema, y luego
+   legal/compartible/disponibilidad), 1 fila de <select> (tipo/facción) y 1
+   fila de checkbox + rango de recompensa + "Limpiar filtros". [hidden]
+   explícito por la misma trampa de siempre (regla de autor display:flex
+   ganando al display:none del user-agent). */
+.mission-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.mission-filters[hidden] { display: none; }
+.mission-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.mission-reward-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+.mission-reward-range input[type="number"] { min-width: 100px; width: 100px; }
+/* Recompensa a la derecha de cada fila de #mission-list: mismo criterio que
+   .craft-side-meta (Crafteo), cifras tabulares y alineadas al borde. */
+.mission-side-reward {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }

@@ -101,6 +101,21 @@ const DATA = {
   marketplaceReady: false,
   uexLocations: [], // catálogo ampliado (ciudades/estaciones/outposts) de data/uex_locations.json
   craft: { blueprints: [], byMaterial: {}, ready: false }, // data/craft_blueprints.json + índice material -> planos
+  // data/missions.json (scmdb.net) resuelto para consumo directo — ver
+  // buildMissionsIndex() para el porqué del formato en disco (titles/
+  // descriptions/reputations son tablas de índices, no se repiten por
+  // misión) y missionsList()/missionsForProduct()/missionsForCraftBlueprint()
+  // para la API pública. `ready` sigue el mismo patrón que craft.ready/
+  // uexReady: false hasta que el fetch tiene éxito, [] no null si falla.
+  missions: {
+    ready: false,
+    list: [], // misiones resueltas: ver buildMissionsIndex()
+    byId: {}, // id de misión -> misión resuelta
+    products: [], // [{tag, productName, gear, type, subtype, manufacturer}], catálogo scmdb.net
+    productToMissions: {}, // productName normalizado (minúsculas) -> [misión, ...] resueltas
+  },
+  _missionsProductsByTag: {}, // tag (grafía original scmdb, p.ej. "BP_CRAFT_...") -> producto
+  _missionsTagIndexLower: {}, // tag.toLowerCase() -> producto; ver missionsForCraftBlueprint()
   _refreshInFlight: null, // promesa del refreshLive() en curso, para deduplicar clicks
   _craftMaterialToOreKey: {}, // nombre de material sc-craft.tools (normalizado) -> clave de `ores`; ver oreKeyForCraftMaterial()
 
@@ -144,6 +159,21 @@ const DATA = {
       this.craft.blueprints = [];
     }
     this.buildCraftIndex();
+
+    // Catálogo de misiones y sus recompensas de plano de crafteo resueltas a
+    // objeto concreto, vendorizado desde scmdb.net (ver
+    // .claude/scripts/fetch_missions.py y .claude/guides/datos-juego.md).
+    // Fichero LOCAL igual que los tres anteriores: protegido igual, si falta
+    // o está corrupto missionsList()/missionsForProduct() devuelven listas
+    // vacías sin romper el arranque.
+    let missionsJson = null;
+    try {
+      const missionsRes = await fetch("data/missions.json");
+      missionsJson = missionsRes.ok ? await missionsRes.json() : null;
+    } catch (_) {
+      missionsJson = null;
+    }
+    this.buildMissionsIndex(missionsJson);
   },
 
   buildIndexes() {
@@ -212,6 +242,140 @@ const DATA = {
       }
     }
     this.craft.ready = this.craft.blueprints.length > 0;
+  },
+
+  // Reconstruye `this.missions` a partir del JSON crudo de data/missions.json
+  // (o lo deja vacío/no-listo si `raw` es null — fichero ausente o corrupto,
+  // ver load()). data/missions.json guarda `title`/`description`/`repMin`/
+  // `repMax` como ÍNDICES enteros en las tablas `raw.titles`/
+  // `raw.descriptions`/`raw.reputations` (deduplicación: 755 descripciones/
+  // 762 títulos/44 reputaciones únicas cubren las 1487 misiones — ver
+  // fetch_missions.py, StringTable) — aquí es donde se resuelven a texto/
+  // objeto real, así que el resto de la app (missionsList() en adelante)
+  // nunca ve un índice crudo. Igualmente, `blueprintRewards[].tag` se
+  // resuelve contra `raw.products` (dict tag -> {productName, gear, type,
+  // subtype, manufacturer}) para entregar el objeto YA COMPLETO por
+  // recompensa, tal como lo espera cualquier vista.
+  buildMissionsIndex(raw) {
+    const productsByTag = (raw && raw.products) || {};
+    this._missionsProductsByTag = productsByTag;
+    this._missionsTagIndexLower = {};
+    for (const [tag, p] of Object.entries(productsByTag)) {
+      this._missionsTagIndexLower[tag.toLowerCase()] = { tag, ...p };
+    }
+    this.missions.products = Object.entries(productsByTag).map(([tag, p]) => ({ tag, ...p }));
+    this.missions.productToMissions = (raw && raw.productToMissions) || {};
+
+    if (!raw || !Array.isArray(raw.missions) || raw.missions.length === 0) {
+      this.missions.list = [];
+      this.missions.byId = {};
+      this.missions.ready = false;
+      return;
+    }
+
+    const titles = raw.titles || [];
+    const descriptions = raw.descriptions || [];
+    const reputations = raw.reputations || [];
+
+    this.missions.list = raw.missions.map((m) => ({
+      id: m.id,
+      title: titles[m.title] ?? "",
+      description: descriptions[m.description] ?? "",
+      category: m.category ?? null,
+      missionType: m.missionType ?? null,
+      faction: m.faction ?? null,
+      illegal: !!m.illegal,
+      systems: m.systems || [],
+      rewardUEC: m.rewardUEC ?? null,
+      buyIn: m.buyIn ?? null,
+      canBeShared: !!m.canBeShared,
+      onceOnly: !!m.onceOnly,
+      repMin: m.repMin != null ? reputations[m.repMin] ?? null : null,
+      repMax: m.repMax != null ? reputations[m.repMax] ?? null : null,
+      prerequisiteLocations: m.prerequisiteLocations || [],
+      cooldownMinutes: m.cooldownMinutes ?? null,
+      // {tag, productName, gear, type, subtype, manufacturer, chance, trigger} —
+      // el objeto crafteable ya resuelto, no solo el tag crudo del fichero.
+      blueprintRewards: (m.blueprintRewards || []).map((r) => {
+        const p = productsByTag[r.tag] || {};
+        return {
+          tag: r.tag,
+          productName: p.productName ?? null,
+          gear: p.gear ?? null,
+          type: p.type ?? null,
+          subtype: p.subtype ?? null,
+          manufacturer: p.manufacturer ?? null,
+          chance: r.chance,
+          trigger: r.trigger ?? null,
+        };
+      }),
+    }));
+
+    this.missions.byId = {};
+    for (const m of this.missions.list) this.missions.byId[m.id] = m;
+    this.missions.ready = true;
+  },
+
+  // Catálogo completo de misiones (data/missions.json, ~1487 en el parche
+  // actual: título, descripción, facción, recompensa UEC, reputación
+  // mín/máx, ubicaciones de prerrequisito, cooldown, y recompensas de plano
+  // ya resueltas a objeto). [] (nunca null) si el fichero falta o no ha
+  // cargado todavía — comprobar `DATA.missions.ready` si la vista necesita
+  // distinguir "vacío de verdad" de "aún sin cargar" (mismo patrón que
+  // `craft.ready`/`uexReady`).
+  missionsList() {
+    return this.missions.list;
+  },
+
+  // Una misión por su `id` (entero, estable dentro del mismo
+  // data/missions.json — puede cambiar tras regenerar el fichero, es dato
+  // generado). null si no existe o si missions.json no ha cargado.
+  missionById(id) {
+    return this.missions.byId[id] || null;
+  },
+
+  // Catálogo de objetos crafteables tal como los trae scmdb.net (~1597 en el
+  // parche actual): [{tag, productName, gear, type, subtype, manufacturer}].
+  // Complementario (no sustituye) a DATA.craftBlueprints() — esa es la
+  // fuente sc-craft.tools con ingredientes/quality_effects; esta es el
+  // catálogo de PRODUCTOS de scmdb.net, pensado como fuente para un buscador
+  // de objetos que luego cruce con misiones vía missionsForProduct(). []
+  // (nunca null) si missions.json no ha cargado.
+  missionProducts() {
+    return this.missions.products;
+  },
+
+  // Misiones que recompensan `productName` (nombre tal como aparece en el
+  // catálogo de productos de scmdb.net — ver missionProducts()), normalizado
+  // igual que la clave de `productToMissions` (trim + minúsculas, sin
+  // sufijos que pelar: a diferencia de craftBaseName, aquí no hay un patrón
+  // "(Ore)"/"Raw" que normalizar, son nombres de objeto fabricado, no de
+  // mineral en bruto). [] si no hay ninguna (nunca null).
+  missionsForProduct(productName) {
+    const key = (productName || "").trim().toLowerCase();
+    if (!key) return [];
+    const ids = this.missions.productToMissions[key] || [];
+    return ids.map((id) => this.missions.byId[id]).filter(Boolean);
+  },
+
+  // Misiones que recompensan el plano `blueprint` de DATA.craftBlueprints()
+  // (data/craft_blueprints.json, fuente sc-craft.tools) o su `blueprint_id`
+  // directamente. Cruce por TAG, no por nombre: sc-craft.tools
+  // (`blueprint_id`, p.ej. "bp_craft_gmni_sniper_ballistic_01_mag") y
+  // scmdb.net (`tag` en missionProducts(), p.ej.
+  // "BP_CRAFT_lbco_sniper_energy_01") identifican el MISMO plano con la
+  // MISMA cadena salvo capitalización — verificado 1589/1589 (100%) en el
+  // parche actual, más fiable que cruzar por `productName`/`name` (99.4%,
+  // 651/655 — unos pocos productos de misión son placeholders internos tipo
+  // "Metamaterial Test #146" que sc-craft.tools no cataloga, o llevan grafía
+  // distinta). Devuelve [] si `blueprint` no trae `blueprint_id`, o si no
+  // hay tag equivalente en scmdb.net, o si no hay misión que lo recompense.
+  missionsForCraftBlueprint(blueprint) {
+    const rawTag = typeof blueprint === "string" ? blueprint : blueprint && blueprint.blueprint_id;
+    if (!rawTag) return [];
+    const product = this._missionsTagIndexLower[rawTag.toLowerCase()];
+    if (!product) return [];
+    return this.missionsForProduct(product.productName);
   },
 
   // Precios UEX: se cargan aparte para que la app funcione aunque la API falle.

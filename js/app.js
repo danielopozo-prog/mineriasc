@@ -1,16 +1,22 @@
 /* Arranque: carga de datos, navegación por pestañas e inicialización
    de cada módulo. Los precios UEX llegan en segundo plano. */
 
+// Activa una pestaña por su slug (data-tab/"tab-<slug>"): función global (no
+// dentro de la IIFE de abajo) porque también la usan saltos programáticos
+// entre vistas — hoy solo Crafteo -> Misiones (ver Missions.show() en
+// js/missions.js), que activa la pestaña "misiones" desde fuera de este
+// archivo. Único punto de la app que cambia qué pestaña está activa: el
+// listener de clic de abajo la reutiliza en vez de duplicar la lógica.
+function activateTab(tabName) {
+  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tabName));
+  document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === "tab-" + tabName));
+  if (tabName === "refineria") Refinery.render();
+}
+
 (async function main() {
   // Navegación por pestañas
   document.querySelectorAll(".tab").forEach((btn) =>
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
-      btn.classList.add("active");
-      document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
-      if (btn.dataset.tab === "refineria") Refinery.render();
-    })
+    btn.addEventListener("click", () => activateTab(btn.dataset.tab))
   );
 
   const meta = document.getElementById("meta-info");
@@ -47,6 +53,7 @@
   Locations.init();
   Inventory.init();
   Signals.init();
+  Missions.init();
   Crafting.init();
 
   // Precios en vivo, sin bloquear la interfaz

@@ -207,3 +207,111 @@ python .claude/scripts/fetch_craft_blueprints.py
     `"Pressurized Ice"`. Disponible tras `await DATA.load()`, no depende de
     que `data/craft_blueprints.json` haya cargado (el índice se construye a
     partir de `ores`, no de los planos).
+
+## Catálogo de misiones (`data/missions.json`)
+
+Contratos del juego (~1487 en el parche actual) con sus recompensas de plano de
+crafteo ya resueltas a objeto concreto — da la vuelta otra vez a la pregunta del
+Buscador/Crafteo: no "¿qué necesito para fabricar esto?" sino "¿en qué misión me
+lo pueden dar?". Dato generado igual que los otros tres: **nunca se edita a
+mano**.
+
+```bash
+python .claude/scripts/fetch_missions.py
+```
+
+- Fuente: **scmdb.net** (JSON estático, también tras Cloudflare — mismo
+  User-Agent de navegador que `fetch_craft_blueprints.py`/`fetch_uex_locations.py`).
+  Tres peticiones GET: `/data/versions.json` (para localizar la build **live**
+  activa — se detecta por `-live.` en el string de versión, p.ej.
+  `4.9.0-live.12344265`; a diferencia de sc-craft.tools, este endpoint no trae
+  un campo `channel` explícito), `/data/merged-<version>.json` (~12 MB:
+  contratos, facciones, `blueprintPools`) y
+  `/data/crafting_blueprints-<version>.json` (~4 MB: catálogo de objetos
+  crafteables de scmdb.net, **fuente distinta** de `data/craft_blueprints.json`
+  de sc-craft.tools — mismo dominio, dos vendorizaciones independientes, ver
+  más abajo el cruce entre ambas).
+- Enlace misión → plano: `contract.blueprintRewards[].blueprintPool` →
+  `blueprintPools[guid].blueprints[]` → cada entrada trae `blueprintRecord`
+  (guid) que se resuelve contra `crafting_blueprints.json` de scmdb (coincidencia
+  715/715, 100 %, verificada en el parche actual — no una muestra). El
+  `chance` de cada `blueprintRewards[]` del contrato es a nivel de **pool
+  completo**; dentro del pool el juego reparte uniformemente entre sus
+  entradas — verificado: `weight` es **siempre 1** en las 94 pools
+  referenciadas por alguna misión en el parche actual, así que
+  `item_chance = chance_del_pool / nº_de_items` es fiel al reparto real, no
+  una aproximación inventada. Si un parche futuro trae `weight != 1` en
+  alguna pool, esa cuenta dejaría de ser exacta — revisar entonces (la
+  asunción está documentada en `fetch_missions.py`, no ignorada).
+- **Formato denormalizado, deliberadamente sin indentar** (a diferencia de
+  `mining_data.json`/`craft_blueprints.json`/`uex_locations.json`, que sí usan
+  `indent=2` porque se pueden inspeccionar a mano): `title`, `description`,
+  `repMin` y `repMax` de cada misión son **índices enteros**, no texto/objeto
+  repetido. Los valores reales viven en tres tablas de nivel superior:
+  - `titles: [string, ...]` — 762 únicos (de 1487 misiones: la mitad
+    comparten texto de sabor entre variantes del mismo contrato).
+  - `descriptions: [string, ...]` — 755 únicos, ya limpios: sin las etiquetas
+    `<EM>`/`<EM4>` del juego (el texto interior se conserva; el juego las usa
+    sin cerrar de forma consistente — alguna descripción abre `<EM>` y cierra
+    `</EM4>`, así en el dato fuente, no un bug del script) y con el salto de
+    línea **literal** de dos caracteres (`\` + `n`, verificado byte a byte
+    contra el JSON descargado — **no** es un `\n` real) convertido a salto de
+    línea real.
+  - `reputations: [{name, minReputation, scope}, ...]` — 44 combinaciones
+    únicas (de 2×1487 referencias `repMin`/`repMax`).
+  - Sin esta deduplicación el fichero pesaba 4,6 MB; con ella, 1,9 MB
+    (objetivo explícito: <2 MB). El resto del ahorro viene de
+    `blueprintRewards[]`: cada fila es solo `{tag, chance, trigger}` (no
+    `productName`/`gear`/`type`/`subtype` repetidos en cada una de las 7152
+    filas de recompensa) — el producto completo se resuelve una única vez por
+    `tag` contra `products`.
+  - `cooldownMinutes` es `null` salvo que `hasPersonalCooldown` sea `true` en
+    el contrato fuente: 891 contratos del parche actual traen un
+    `personalCooldownTime` "residual" con el flag apagado — copiarlo tal cual
+    insinuaría un cooldown que no existe, así que se descarta.
+  - Quirk de contenido (no de este script): 25 descripciones contienen
+    literalmente el texto `<None>` (placeholder interno del juego, no una
+    etiqueta de énfasis) — se deja tal cual, no se "limpia" contenido que no
+    se pidió limpiar.
+- `products`: dict `tag -> {productName, gear, type, subtype, manufacturer}`
+  (1597 en el parche actual), catálogo de objetos crafteables de scmdb.net.
+  Indexado por `tag` (identificador estable del plano) y no por `productName`
+  porque **`productName` tiene 15 colisiones** en el parche actual (p.ej. dos
+  "Argus Helmet Black/Silver" con `tag`/guid distintos) — no sirve como clave
+  única.
+- `productToMissions`: `productName` normalizado (trim + minúsculas) →
+  `[missionId, ...]`. 655 productos tienen al menos una misión asociada.
+- **Cruce con `data/craft_blueprints.json` (sc-craft.tools)**: el `tag` de
+  scmdb.net y el `blueprint_id` de sc-craft.tools identifican el **mismo
+  plano** con la **misma cadena salvo capitalización**
+  (`"BP_CRAFT_lbco_sniper_energy_01"` vs
+  `"bp_craft_gmni_sniper_ballistic_01_mag"`) — verificado **1589/1589 (100 %)**
+  en el parche actual comparando en minúsculas. Es más fiable que cruzar por
+  nombre (`productName` vs `name`): por nombre da 651/655 (99,4 %) porque
+  algunos objetos recompensados por misión son placeholders internos que
+  sc-craft.tools no cataloga (p. ej. `"Metamaterial Test #146"`) o llevan
+  grafía distinta. `DATA.missionsForCraftBlueprint()` usa el cruce por tag,
+  no por nombre — ver más abajo.
+- Consumo: `DATA.load()` lo carga tras `craft_blueprints.json`, envuelto en
+  `try/catch` — si falta o está corrupto, `DATA.missionsList()`/
+  `DATA.missionProducts()`/`DATA.missionsForProduct()`/
+  `DATA.missionsForCraftBlueprint()` devuelven `[]` sin romper el arranque
+  (`DATA.missions.ready` queda en `false`, mismo patrón que `craft.ready`/
+  `uexReady`). `DATA.buildMissionsIndex(raw)` es donde se resuelven los
+  índices de `titles`/`descriptions`/`reputations` y el `tag` de cada
+  `blueprintRewards[]` contra `products` — el resto de la app nunca ve un
+  índice crudo ni un `tag` sin resolver. Contrato expuesto:
+  - `DATA.missionsList()` → `[]` con todas las misiones ya resueltas a texto
+    y objeto (nunca índices), `blueprintRewards[]` con
+    `{tag, productName, gear, type, subtype, manufacturer, chance, trigger}`
+    completo por fila.
+  - `DATA.missionById(id)` → una misión resuelta o `null`.
+  - `DATA.missionProducts()` → `[]` con el catálogo de objetos de scmdb.net
+    (`{tag, productName, gear, type, subtype, manufacturer}`), pensado como
+    fuente de un buscador de objetos crafteables.
+  - `DATA.missionsForProduct(productName)` → misiones (resueltas) que
+    recompensan ese objeto, vía `productToMissions`. `[]` si no hay ninguna.
+  - `DATA.missionsForCraftBlueprint(blueprint | blueprint_id)` → misiones que
+    recompensan ese plano de `DATA.craftBlueprints()`, cruzando por
+    `blueprint_id`/`tag` (no por nombre, ver más arriba). `[]` si el plano no
+    tiene tag equivalente en scmdb.net o si ninguna misión lo recompensa.

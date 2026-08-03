@@ -9,7 +9,11 @@ Panel de minería para **Star Citizen**, inspirado en [Strata](https://seeknd.gi
 - **Refinería** — métodos de refinado con valoraciones (rendimiento/coste/velocidad, en vivo de UEX) y tabla de bonos de rendimiento por estación.
 - **Inventario personal** — registra lo que minas, agrupa por mineral o ubicación, calcula el valor estimado con precios UEX y exporta a JSON o al portapapeles con formato Discord. Dos modos de alta: mineral concreto (con cantidad en SCU) o materiales genéricos (Minerales/Armas/Armaduras/Tarjetas/Pinturas/Otros) marcados con checkboxes múltiples y una nota libre compartida, sin cantidad. Todo se guarda en el `localStorage` de tu navegador.
 - **Señales** — multiplicadores de señal de escáner (x1-x15) por mineral, con búsqueda inversa y favoritos.
-- **Crafteo** — lista lateral, siempre visible, de los 36 materiales usados en planos de fabricación (con buscador propio y ordenable por nombre, nº de objetos crafteables o rareza); al elegir uno, los objetos que lo requieren agrupados en secciones plegables con filtros por peso/pieza de armadura o tipo de arma, cada uno con ficha de ingredientes por slot, tiempo de fabricación, misiones que sueltan el plano y un simulador de calidad (slider 0-1000 que interpola los efectos de cada ingrediente).
+- **Crafteo** — dos modos en la lista lateral, con un conmutador Materiales/Objetos:
+  - *Materiales* — lista siempre visible de los 36 materiales usados en planos de fabricación (buscador propio, ordenable por nombre, nº de objetos crafteables o rareza); al elegir uno, los objetos que lo requieren agrupados en secciones plegables con filtros por peso/pieza de armadura o tipo de arma.
+  - *Objetos* — busca directamente en el catálogo de ~1600 objetos (armadura, armas, munición, componentes de nave…) por texto, categoría y subtipo dependiente.
+  - En ambos modos, la ficha trae ingredientes por slot, tiempo de fabricación, un simulador de calidad (slider 0-1000 que interpola los efectos de cada ingrediente) y las misiones que recompensan ese objeto, con enlace directo a su ficha en la pestaña Misiones.
+- **Misiones** — catálogo de contratos con filtros por texto, categoría, sistema, tipo de misión, facción, legalidad, si es compartible, si es única o repetible, si reparte algún plano de crafteo y rango de recompensa en UEC; lista ordenable por recompensa, título o facción. La ficha muestra descripción, facción, reputación requerida, prerrequisitos de ubicación, cooldown y las recompensas de plano que reparte.
 - **Contadores** (`contadores.html`, enlazada desde la cabecera) — temporizadores de Hangar Ejecutivo, impresoras de tarjetas, bóveda de Ruin Station, ciclo de loot y Compboards. Página hermana independiente, con su propio CSS y estado en `localStorage`.
 - **Desplegables con buscador** — los selectores con muchas opciones (mineral y ubicación en Inventario, ubicación de minado en Señales…) se abren como un combo con un cuadro de texto que filtra en vivo, insensible a mayúsculas y acentos, con navegación por teclado.
 
@@ -36,6 +40,7 @@ automáticamente. Deja la ventana abierta mientras uses la app; para pararlo, ci
 | Minerales, ubicaciones, señales, dificultad | `data/mining_data.json` (base de Strata) | Manual: re-descargar de Strata con cada parche |
 | Estaciones, ciudades y outposts | `data/uex_locations.json` (catálogo UEX) | Manual: regenerar con `fetch_uex_locations.py` con cada parche |
 | Planos de fabricación (crafteo) | `data/craft_blueprints.json` (sc-craft.tools) | Manual: regenerar con `fetch_craft_blueprints.py` con cada parche |
+| Misiones y sus recompensas de plano | `data/missions.json` (scmdb.net) | Manual: regenerar con `fetch_missions.py` con cada parche |
 
 Para actualizar los datos de juego tras un parche:
 
@@ -43,12 +48,13 @@ Para actualizar los datos de juego tras un parche:
 curl -o data/mining_data.json https://seeknd.github.io/Strata/data/mining_data.json
 python .claude/scripts/fetch_uex_locations.py
 python .claude/scripts/fetch_craft_blueprints.py
+python .claude/scripts/fetch_missions.py
 ```
 
 ## Estructura
 
 ```
-index.html          Interfaz con las 6 pestañas
+index.html          Interfaz con las 7 pestañas
 css/styles.css      Tema oscuro espacial
 js/uex.js           Cliente de la API UEX con caché
 js/data.js          Carga del JSON e índices (mineral↔ubicación)
@@ -58,10 +64,12 @@ js/locations.js     Pestaña Ubicaciones
 js/refinery.js      Pestaña Refinería
 js/inventory.js     Pestaña Inventario
 js/signals.js       Pestaña Señales
-js/crafting.js      Pestaña Crafteo
+js/missions.js      Pestaña Misiones
+js/crafting.js      Pestaña Crafteo (modos Materiales/Objetos)
 data/mining_data.json      Datos de juego (parche 4.9)
 data/uex_locations.json    Catálogo de estaciones/ciudades/outposts UEX
 data/craft_blueprints.json Planos de fabricación (sc-craft.tools)
+data/missions.json         Catálogo de misiones y recompensas de plano (scmdb.net)
 
 contadores.html      Página hermana de temporizadores (independiente)
 css/contadores.css   Estilos propios de contadores.html

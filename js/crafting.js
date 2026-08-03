@@ -136,6 +136,46 @@ function craftSectionLabel(key) {
   return CRAFT_SECTION_ES[key] || key.split("/").join(" · ");
 }
 
+/* ---------- Modo "Objetos" (búsqueda directa en el catálogo de scmdb.net) ----------
+   A diferencia del modo "Materiales" (arriba: material -> lista de objetos
+   que lo usan -> ficha), este modo busca directamente en DATA.missionProducts()
+   (1597 objetos, misma fuente que usa js/missions.js para las recompensas de
+   plano) por texto + categoría (gear+type combinados) + subtipo dependiente.
+   Categorías agrupadas "de forma sensata" (pedido del encargo): verificado
+   contra el catálogo completo del parche actual (python -c sobre
+   data/missions.json) que solo existen estas 14 combinaciones reales de
+   gear+type — cualquier combinación futura no listada aquí simplemente no
+   aparece como categoría (ver renderObjectCategoryFilter), no rompe nada. */
+const CRAFT_OBJ_CATEGORIES = [
+  { key: "fpsgear:armour", label: "Armadura", gear: "fpsgear", type: "armour" },
+  { key: "fpsgear:weapons", label: "Armas FPS", gear: "fpsgear", type: "weapons" },
+  { key: "fpsgear:ammo", label: "Munición", gear: "fpsgear", type: "ammo" },
+  { key: "vehiclegear:weapons", label: "Armamento de nave", gear: "vehiclegear", type: "weapons" },
+  { key: "vehiclegear:cooler", label: "Refrigeración de nave", gear: "vehiclegear", type: "cooler" },
+  { key: "vehiclegear:powerplant", label: "Planta de energía", gear: "vehiclegear", type: "powerplant" },
+  { key: "vehiclegear:shield", label: "Escudos de nave", gear: "vehiclegear", type: "shield" },
+  { key: "vehiclegear:radar", label: "Radar y contramedidas", gear: "vehiclegear", type: "radar" },
+  { key: "vehiclegear:quantumdrive", label: "Motor cuántico", gear: "vehiclegear", type: "quantumdrive" },
+  { key: "vehiclegear:mininglaser", label: "Láser de minería (nave)", gear: "vehiclegear", type: "mininglaser" },
+  { key: "vehiclegear:tractorbeam", label: "Rayo tractor", gear: "vehiclegear", type: "tractorbeam" },
+  { key: "vehiclegear:refuelling", label: "Repostaje", gear: "vehiclegear", type: "refuelling" },
+  { key: "vehiclegear:salvage", label: "Reciclaje de nave", gear: "vehiclegear", type: "salvage" },
+  { key: "missionitems:null", label: "Objetos de misión", gear: "missionitems", type: null },
+];
+
+function craftObjKeyFor(p) {
+  return `${p.gear}:${p.type || "null"}`;
+}
+
+// Nombre a mostrar de un producto: `productName` casi siempre lo trae (1587
+// de 1597); los 10 restantes no tienen nombre catalogado por scmdb.net — se
+// deriva uno legible de su `tag` (p.ej. "BP_CRAFT_foo_bar_01" -> "foo bar
+// 01") en vez de mostrar el tag crudo, que no es un nombre pensado para leer.
+function craftObjLabel(p) {
+  if (p.productName) return p.productName;
+  return (p.tag || "").replace(/^BP_CRAFT_/i, "").replace(/_/g, " ").trim() || "(sin nombre)";
+}
+
 /* ---------- Filtros por chips (peso/pieza de armadura, tipo de arma) ----------
    Al estilo de los filtros de sc-craft.tools. Verificado contra los 1589
    planos del parche actual (no una muestra): */
@@ -248,6 +288,14 @@ const Crafting = {
   MATERIAL_SORT_KEY: "mineriasc_crafting_sort",
   materialSearch: "", // texto del buscador de materiales, en minúsculas
 
+  // ---- Modo "Objetos" (ver bloque CRAFT_OBJ_CATEGORIES arriba) ----
+  craftMode: "materials", // "materials" | "objects"
+  objectSearch: "",
+  objectCategory: "todas",
+  objectSubtype: "todos",
+  selectedProductTag: null,
+  _blueprintByTagLower: null, // caché memoizada, ver blueprintByTagIndex()
+
   init() {
     if (!DATA.craft.ready) {
       this.renderUnavailable();
@@ -271,6 +319,263 @@ const Crafting = {
     this.renderMaterials();
     this.renderFilters();
     this.renderList();
+
+    // ---- Modo "Objetos" ----
+    document.getElementById("craft-mode-materials").addEventListener("click", () => this.setMode("materials"));
+    document.getElementById("craft-mode-objects").addEventListener("click", () => this.setMode("objects"));
+
+    document.getElementById("craft-object-search").addEventListener("input", (e) => {
+      this.objectSearch = e.target.value.trim().toLowerCase();
+      this.renderObjects();
+    });
+    this.renderObjectCategoryFilter();
+    document.getElementById("craft-object-category").addEventListener("change", (e) => {
+      this.objectCategory = e.target.value;
+      this.renderObjectSubtypeFilter();
+      this.renderObjects();
+    });
+    document.getElementById("craft-object-subtype").addEventListener("change", (e) => {
+      this.objectSubtype = e.target.value;
+      this.renderObjects();
+    });
+    this.renderObjectSubtypeFilter(); // estado inicial: oculto (objectCategory = "todas")
+  },
+
+  // Alterna entre los dos modos de la lista lateral (ver #craft-mode-materials/
+  // #craft-mode-objects en index.html): cada modo resetea por completo el
+  // estado de selección del OTRO (mismo criterio que selectMaterial() ya usa
+  // al cambiar de material — nunca se arrastra una selección entre contextos
+  // distintos) para no dejar la ficha de la derecha mostrando algo que ya no
+  // corresponde a lo que hay marcado en la izquierda.
+  setMode(mode) {
+    if (this.craftMode === mode) return;
+    this.craftMode = mode;
+    document.getElementById("craft-mode-materials").classList.toggle("active", mode === "materials");
+    document.getElementById("craft-mode-objects").classList.toggle("active", mode === "objects");
+    document.getElementById("craft-materials-controls").hidden = mode !== "materials";
+    document.getElementById("craft-objects-controls").hidden = mode !== "objects";
+
+    if (mode === "materials") {
+      this.selectedProductTag = null;
+      this.renderMaterials();
+      this.renderFilters();
+      this.renderList();
+      document.getElementById("craft-detail").innerHTML =
+        '<p class="placeholder">Selecciona un objeto de la lista para ver su ficha de fabricación.</p>';
+    } else {
+      this.selectedMaterial = null;
+      this.selectedBlueprintId = null;
+      this.items = [];
+      document.getElementById("craft-filters").hidden = true;
+      document.getElementById("craft-count-hint").textContent = "";
+      document.getElementById("craft-list").innerHTML =
+        '<p class="placeholder">Elige un objeto en el panel de la izquierda para ver su ficha.</p>';
+      this.renderObjects();
+      document.getElementById("craft-detail").innerHTML =
+        '<p class="placeholder">Selecciona un objeto de la lista para ver su ficha.</p>';
+    }
+  },
+
+  // Índice tag (minúsculas) -> plano local, memoizado (DATA.craftBlueprints()
+  // no cambia durante la sesión). Cruce por `blueprint_id` de sc-craft.tools
+  // vs `tag` de scmdb.net — misma pareja de campos y mismo criterio
+  // (case-insensitive) que DATA.missionsForCraftBlueprint() en js/data.js,
+  // pero en sentido inverso (de producto a plano, no de plano a misión).
+  blueprintByTagIndex() {
+    if (!this._blueprintByTagLower) {
+      this._blueprintByTagLower = {};
+      for (const bp of DATA.craftBlueprints()) {
+        if (bp.blueprint_id) this._blueprintByTagLower[bp.blueprint_id.toLowerCase()] = bp;
+      }
+    }
+    return this._blueprintByTagLower;
+  },
+
+  blueprintForProduct(p) {
+    return this.blueprintByTagIndex()[(p.tag || "").toLowerCase()] || null;
+  },
+
+  // Opciones del <select> de categoría: solo las combinaciones de
+  // CRAFT_OBJ_CATEGORIES que de verdad tienen algún objeto en el catálogo
+  // cargado (si data/missions.json faltara, ninguna tendría objetos y el
+  // select quedaría solo con "Todas las categorías (0)" — degradación
+  // silenciosa, sin romper el resto del modo). Se calcula una sola vez en
+  // init(): el catálogo no cambia durante la sesión.
+  renderObjectCategoryFilter() {
+    const sel = document.getElementById("craft-object-category");
+    const counts = new Map(); // key -> nº de objetos
+    for (const p of DATA.missionProducts()) {
+      const key = craftObjKeyFor(p);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    const options = CRAFT_OBJ_CATEGORIES.filter((c) => counts.has(c.key))
+      .map((c) => `<option value="${esc(c.key)}">${esc(c.label)} (${counts.get(c.key)})</option>`)
+      .join("");
+    sel.innerHTML = `<option value="todas">Todas las categorías (${DATA.missionProducts().length})</option>${options}`;
+    sel.value = this.objectCategory;
+  },
+
+  // Subtipo dependiente de la categoría elegida: oculto si no hay categoría
+  // seleccionada ("todas") o si esa categoría solo tiene un subtipo real (el
+  // filtro no aportaría nada — p.ej. "Repostaje" solo tiene "Tobera").
+  renderObjectSubtypeFilter() {
+    const sel = document.getElementById("craft-object-subtype");
+    if (this.objectCategory === "todas") {
+      sel.hidden = true;
+      this.objectSubtype = "todos";
+      return;
+    }
+    const cat = CRAFT_OBJ_CATEGORIES.find((c) => c.key === this.objectCategory);
+    const inCategory = DATA.missionProducts().filter((p) => p.gear === cat.gear && (p.type || null) === cat.type);
+    const counts = new Map(); // subtype (o null) -> {label, count}
+    for (const p of inCategory) {
+      const st = p.subtype || null;
+      const label = st ? missionSubtypeLabel(st) : "Sin subtipo";
+      const entry = counts.get(st) || { label, count: 0 };
+      entry.count += 1;
+      counts.set(st, entry);
+    }
+    if (counts.size <= 1) {
+      sel.hidden = true;
+      this.objectSubtype = "todos";
+      return;
+    }
+    const rows = [...counts.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label, "es"));
+    sel.hidden = false;
+    sel.innerHTML =
+      `<option value="todos">Todos los subtipos (${inCategory.length})</option>` +
+      rows.map(([st, e]) => `<option value="${esc(st ?? "none")}">${esc(e.label)} (${e.count})</option>`).join("");
+    sel.value = this.objectSubtype;
+  },
+
+  objectMatchesFilters(p) {
+    if (this.objectSearch && !craftObjLabel(p).toLowerCase().includes(this.objectSearch)) return false;
+    if (this.objectCategory !== "todas") {
+      const cat = CRAFT_OBJ_CATEGORIES.find((c) => c.key === this.objectCategory);
+      if (!cat || p.gear !== cat.gear || (p.type || null) !== cat.type) return false;
+      if (this.objectSubtype !== "todos") {
+        const want = this.objectSubtype === "none" ? null : this.objectSubtype;
+        if ((p.subtype || null) !== want) return false;
+      }
+    }
+    return true;
+  },
+
+  // Lista lateral en modo Objetos: reemplaza a renderMaterials() en el mismo
+  // contenedor (#craft-materials) — ver setMode(). Cada fila indica si el
+  // objeto tiene receta local (sc-craft.tools) o no (~8 de 1597, ficha
+  // mínima vía renderObjectDetail()).
+  renderObjects() {
+    const listEl = document.getElementById("craft-materials");
+    const all = DATA.missionProducts();
+    if (!all.length) {
+      listEl.innerHTML = '<p class="placeholder">Catálogo de objetos no disponible (data/missions.json).</p>';
+      return;
+    }
+    const filtered = all
+      .filter((p) => this.objectMatchesFilters(p))
+      .sort((a, b) => craftObjLabel(a).localeCompare(craftObjLabel(b), "es"));
+
+    if (!filtered.length) {
+      listEl.innerHTML = '<p class="placeholder">Ningún objeto coincide con los filtros.</p>';
+      return;
+    }
+
+    listEl.innerHTML = filtered
+      .map((p) => {
+        const hasLocal = !!this.blueprintForProduct(p);
+        const metaParts = [missionGearLabel(p.gear)];
+        if (p.type) metaParts.push(missionTypeLabel(p.type));
+        if (p.subtype) metaParts.push(missionSubtypeLabel(p.subtype));
+        return `<div class="side-item ${p.tag === this.selectedProductTag ? "active" : ""}" data-tag="${esc(p.tag)}">
+          <span class="side-item-name">${esc(craftObjLabel(p))}${hasLocal ? "" : ' <span class="hint">(sin receta)</span>'}</span>
+          <span class="sub">${esc(metaParts.join(" · "))}</span>
+        </div>`;
+      })
+      .join("");
+
+    listEl.querySelectorAll(".side-item").forEach((el) =>
+      el.addEventListener("click", () => this.selectObject(el.dataset.tag))
+    );
+  },
+
+  selectObject(tag) {
+    this.selectedProductTag = tag || null;
+    this.renderObjects();
+    this.renderObjectDetail();
+  },
+
+  // Ficha de un objeto elegido en modo "Objetos": si tiene receta local
+  // (cruce por tag, ver blueprintForProduct) reutiliza renderDetail() tal
+  // cual — la misma ficha completa que en modo Materiales, con ingredientes,
+  // simulador de calidad y AMBAS tablas de misiones (ver renderDetail: la de
+  // sc-craft.tools ya existente + la nueva de scmdb.net con enlace). Si no
+  // hay receta local (~8 de 1597), ficha mínima con lo que sí se sabe del
+  // catálogo de scmdb.net y, si las hay, sus misiones — sin inventar
+  // ingredientes que no existen en ninguna fuente.
+  renderObjectDetail() {
+    const el = document.getElementById("craft-detail");
+    const product = DATA.missionProducts().find((p) => p.tag === this.selectedProductTag);
+    if (!product) {
+      el.innerHTML = '<p class="placeholder">Selecciona un objeto de la lista para ver su ficha.</p>';
+      return;
+    }
+
+    const bp = this.blueprintForProduct(product);
+    if (bp) {
+      this.selectedBlueprintId = bp.id;
+      this.renderDetail();
+      return;
+    }
+
+    const metaParts = [missionGearLabel(product.gear)];
+    if (product.type) metaParts.push(missionTypeLabel(product.type));
+    if (product.subtype) metaParts.push(missionSubtypeLabel(product.subtype));
+    if (product.manufacturer) metaParts.push(product.manufacturer);
+
+    const missions = DATA.missionsForProduct(product.productName);
+    el.innerHTML = `
+      <div class="detail-head-row"><h3>${esc(craftObjLabel(product))}</h3></div>
+      <p class="subtitle">${esc(metaParts.join(" · "))}</p>
+      <p class="hint">Sin receta de fabricación en el catálogo local (sc-craft.tools no lo cataloga todavía).</p>
+      ${this.missionsSectionHtml(missions)}
+    `;
+    this.bindMissionLinks();
+  },
+
+  // Tabla "Misiones que recompensan este objeto" — fuente scmdb.net
+  // (DATA.missionsForCraftBlueprint/missionsForProduct), NO confundir con la
+  // tabla "Misiones que sueltan este plano" de renderDetail() (fuente
+  // sc-craft.tools, bp.missions, sin id de misión con el que enlazar). Vacía
+  // -> no se muestra nada, ni el título de sección (mejor que una tabla
+  // vacía con un mensaje).
+  missionsSectionHtml(missions) {
+    if (!missions || !missions.length) return "";
+    const rows = [...missions]
+      .sort((a, b) => (b.rewardUEC ?? -1) - (a.rewardUEC ?? -1))
+      .map(
+        (m) => `<tr>
+          <td>${esc(m.title || "(sin título)")}</td>
+          <td>${esc(m.faction || "—")}</td>
+          <td class="num">${m.rewardUEC != null ? fmtNum(m.rewardUEC) + " UEC" : "—"}</td>
+          <td><button type="button" class="btn small craft-mission-link" data-id="${m.id}">Ver misión →</button></td>
+        </tr>`
+      )
+      .join("");
+    return `
+      <h4>Misiones que recompensan este objeto (${missions.length})</h4>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Misión</th><th>Facción</th><th>Recompensa</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`;
+  },
+
+  // Enlaces "Ver misión →" de missionsSectionHtml: saltan a la pestaña
+  // Misiones vía Missions.show(id) (js/missions.js), único punto de entrada
+  // público de esa vista.
+  bindMissionLinks() {
+    document.querySelectorAll("#craft-detail .craft-mission-link").forEach((btn) =>
+      btn.addEventListener("click", () => Missions.show(Number(btn.dataset.id)))
+    );
   },
 
   loadMaterialSort() {
@@ -663,6 +968,8 @@ const Crafting = {
               <tbody>${missionRows}</tbody></table></div>`
           : '<span class="hint">Sin misiones registradas que suelten este plano.</span>'
       }
+
+      ${this.missionsSectionHtml(DATA.missionsForCraftBlueprint(bp))}
     `;
 
     document.getElementById("craft-quality-slider").addEventListener("input", (e) => {
@@ -671,6 +978,7 @@ const Crafting = {
       this.renderQualityEffects(bp);
     });
     this.renderQualityEffects(bp);
+    this.bindMissionLinks();
   },
 
   // Tarjetas del simulador: una por ingrediente con quality_effects, cada una

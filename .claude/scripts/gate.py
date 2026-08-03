@@ -152,6 +152,68 @@ def main():
           re.search(r"craftByMaterial\(oreKeyOrName\)\s*\{[\s\S]{0,300}craftBaseName", data_js_src_for_craft)
           is not None)
 
+    # --- catálogo de misiones (data/missions.json) ------------------------
+    # Vendorizado desde scmdb.net (script .claude/scripts/fetch_missions.py),
+    # cruza contratos del juego con sus recompensas de plano de crafteo (ya
+    # resueltas a producto) — ver .claude/guides/datos-juego.md. El script es
+    # DURO (siempre debe existir); el propio missions.json es TOLERANTE
+    # (mismo patrón que uex_locations.json/craft_blueprints.json: si falta,
+    # DATA.missionsList()/etc. degradan a [] sin romper el arranque — ver
+    # data.js más abajo) así que sus checks de contenido solo corren si el
+    # fichero existe.
+    check("fetch_missions.py existe", (ROOT / ".claude" / "scripts" / "fetch_missions.py").exists())
+
+    missions_path = ROOT / "data" / "missions.json"
+    if missions_path.exists():
+        try:
+            missions_data = json.loads(missions_path.read_text(encoding="utf-8"))
+            check("missions.json parsea", True)
+            required_top_keys = {"meta", "titles", "descriptions", "reputations",
+                                  "missions", "products", "productToMissions"}
+            check("missions.json tiene las claves de nivel superior esperadas",
+                  required_top_keys <= missions_data.keys(),
+                  f"faltan: {sorted(required_top_keys - missions_data.keys())}")
+            missions_list = missions_data.get("missions")
+            check("missions.json tiene 'missions' no vacio", isinstance(missions_list, list) and bool(missions_list))
+            if isinstance(missions_list, list) and missions_list:
+                # title/description/repMin/repMax son INDICES enteros en las
+                # tablas titles/descriptions/reputations (deduplicacion, ver
+                # datos-juego.md) — no texto/objeto repetido por mision.
+                required_mission_keys = {"id", "title", "description", "category", "missionType",
+                                          "faction", "illegal", "systems", "rewardUEC", "buyIn",
+                                          "canBeShared", "onceOnly", "repMin", "repMax",
+                                          "prerequisiteLocations", "cooldownMinutes", "blueprintRewards"}
+                check("missions.json: misiones tienen las claves esperadas",
+                      all(required_mission_keys <= m.keys() for m in missions_list),
+                      "faltan claves en alguna mision")
+                rewarded = [m for m in missions_list if m.get("blueprintRewards")]
+                check("missions.json: hay misiones con blueprintRewards", bool(rewarded))
+                if rewarded:
+                    reward_sample = rewarded[0]["blueprintRewards"][0]
+                    check("missions.json: blueprintRewards trae tag/chance/trigger",
+                          {"tag", "chance", "trigger"} <= reward_sample.keys())
+                    # el tag debe resolver contra 'products' (dict tag -> producto,
+                    # no lista) — si no resuelve, DATA.missionsList() devolveria
+                    # productName/gear/type/subtype vacios en silencio.
+                    check("missions.json: el tag de blueprintRewards resuelve en 'products'",
+                          reward_sample["tag"] in (missions_data.get("products") or {}))
+        except Exception as e:  # noqa: BLE001
+            check("missions.json parsea", False, str(e))
+
+    data_js_for_missions = (ROOT / "js" / "data.js").read_text(encoding="utf-8")
+    check("data.js: missions.json se carga en load() (try/catch, no bloqueante)",
+          "data/missions.json" in data_js_for_missions
+          and re.search(r"try\s*\{[\s\S]{0,200}data/missions\.json", data_js_for_missions) is not None)
+    check("data.js: buildMissionsIndex definido", "buildMissionsIndex(raw)" in data_js_for_missions)
+    for fn in ("missionsList()", "missionById(id)", "missionProducts()",
+               "missionsForProduct(productName)", "missionsForCraftBlueprint(blueprint)"):
+        check(f"data.js: {fn} definido", fn in data_js_for_missions)
+    # cruce por TAG (no por nombre) con sc-craft.tools: mas fiable (100%
+    # verificado) que cruzar por productName/name (99,4%, ver datos-juego.md).
+    check("data.js: missionsForCraftBlueprint cruza por blueprint_id/tag, no por nombre",
+          re.search(r"missionsForCraftBlueprint\(blueprint\)\s*\{[\s\S]{0,300}blueprint_id",
+                     data_js_for_missions) is not None)
+
     # --- pestaña "Crafteo" (busqueda inversa de blueprints por material) ---
     craft_view_path = ROOT / "js" / "crafting.js"
     check("js/crafting.js existe", craft_view_path.exists())

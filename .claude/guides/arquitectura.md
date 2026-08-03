@@ -15,12 +15,19 @@ js/refinery.js   → objeto Refinery (pestaña Refinería, render perezoso)
 js/inventory.js  → objeto Inventory (pestaña Inventario)
 js/signals.js    → objeto Signals (pestaña Señales, múltiplos de escáner,
                    búsqueda inversa y favoritos de mineral)
+js/missions.js   → objeto Missions (pestaña Misiones, ver más abajo) + diccionarios
+                   gear/type/subtype de scmdb.net, reutilizados por crafting.js
 js/crafting.js   → objeto Crafting (pestaña Crafteo, búsqueda inversa de
-                   blueprints por material, ver más abajo)
+                   blueprints por material o por objeto, ver más abajo)
 js/app.js        → arranque: DATA.load() → init de vistas → DATA.loadUexPrices()
 ```
 
 El orden importa: cada módulo asume que los anteriores existen como globales.
+`js/missions.js` carga ANTES que `js/crafting.js` porque el modo "Objetos" de
+Crafteo reutiliza sus diccionarios de traducción (`MISSION_GEAR_ES`/
+`MISSION_TYPE_TAX_ES`/`MISSION_SUBTYPE_ES` y las funciones `missionGearLabel`/
+`missionTypeLabel`/`missionSubtypeLabel`) — misma taxonomía de
+`DATA.missionProducts()`, no duplicada en dos archivos.
 
 ## Flujo de arranque (app.js)
 
@@ -33,11 +40,12 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
    (incluida la pestaña Crafteo, con su propio mensaje de estado) sigue funcionando sin
    bloquear el arranque.
 2. `Finder.init()`, `Locations.init()`, `Inventory.init()`, `Signals.init()`,
-   `Crafting.init()` — la app ya es usable con datos de juego, sin precios. Cualquier
-   vista que necesite el listado COMPLETO de ubicaciones (no solo zonas de minado) usa
-   `DATA.allLocations()` — síncrona, ya resuelta tras `await DATA.load()`, sin fetch
-   adicional. `Crafting.init()` no depende de UEX en absoluto (100% datos locales, igual
-   que `DATA.craftBlueprints()`/`DATA.craftByMaterial()`).
+   `Missions.init()`, `Crafting.init()` — la app ya es usable con datos de juego, sin
+   precios. Cualquier vista que necesite el listado COMPLETO de ubicaciones (no solo
+   zonas de minado) usa `DATA.allLocations()` — síncrona, ya resuelta tras
+   `await DATA.load()`, sin fetch adicional. `Crafting.init()`/`Missions.init()` no
+   dependen de UEX en absoluto (100% datos locales, igual que
+   `DATA.craftBlueprints()`/`DATA.craftByMaterial()`/`DATA.missionsList()`).
 3. `DATA.loadUexPrices()` — en segundo plano; al resolver, re-renderiza las vistas que
    muestran precios (`Signals` no depende de UEX — solo lee `scanner_signals`, así que
    no se refresca aquí). Si la API falla, la app sigue funcionando (el header lo indica).
@@ -113,11 +121,11 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
   (caché de la API con timestamp), `mineriasc_favorites` (array de claves de
   mineral marcadas como favoritas en la pestaña Señales), y el criterio de orden
   de cada lista ordenable (ver más abajo): `mineriasc_finder_sort`,
-  `mineriasc_locations_sort`, `mineriasc_crafting_sort`.
-- **Listas ordenables** (Buscador, Ubicaciones, Crafteo): un `<select>` pequeño
-  (≤5 opciones, nunca envuelto con `SearchSelect`) junto al buscador/filtro de
-  cada pestaña, dentro de un contenedor `.panel-head-actions`. Mismo patrón en
-  las tres vistas — estado `sortBy`/`SORT_KEY`, `loadSort()`/`saveSort()`
+  `mineriasc_locations_sort`, `mineriasc_crafting_sort`, `mineriasc_missions_sort`.
+- **Listas ordenables** (Buscador, Ubicaciones, Crafteo, Misiones): un `<select>`
+  pequeño (≤5 opciones, nunca envuelto con `SearchSelect`) junto al buscador/filtro
+  de cada pestaña, dentro de un contenedor `.panel-head-actions`. Mismo patrón en
+  las cuatro vistas — estado `sortBy`/`SORT_KEY`, `loadSort()`/`saveSort()`
   (try/catch por si `localStorage` no está disponible, igual que el resto de
   la app) y el `<select>`.value ya sirve de indicador del criterio activo, sin
   marcado extra. Criterios numéricos: descendente por defecto, valores sin
@@ -323,6 +331,77 @@ sufijo "ud".
 `Crafting.init()` llama a `renderUnavailable()` en vez de montar el selector
 — mensaje de estado, selector deshabilitado, resto de la app intacta.
 
+### Modo "Objetos" (`Crafting.craftMode`)
+
+Segundo modo de la lista lateral, alternado con "Materiales" vía dos botones
+(`#craft-mode-materials`/`#craft-mode-objects`, `Crafting.setMode()`) que
+reutilizan el MISMO contenedor `#craft-materials`: en vez de partir de un
+material y ver qué lo usa, busca directamente en el catálogo de scmdb.net
+(`DATA.missionProducts()`, ~1600 objetos — la misma fuente que consume
+`js/missions.js`) por texto + categoría + subtipo dependiente.
+
+- `CRAFT_OBJ_CATEGORIES` agrupa las 14 combinaciones reales de `gear`+`type`
+  vistas en el catálogo del parche actual (Armadura, Armas FPS, Munición,
+  Armamento de nave, Refrigeración, Planta de energía, Escudos, Radar, Motor
+  cuántico, Láser de minería, Rayo tractor, Repostaje, Reciclaje de nave,
+  Objetos de misión) — una combinación futura no listada aquí simplemente no
+  aparece como opción de categoría, no rompe nada. El subtipo (`<select>`
+  dependiente, `#craft-object-subtype`) se oculta si la categoría elegida solo
+  tiene un subtipo real (el filtro no aportaría nada).
+- `Crafting.blueprintForProduct(product)` cruza `product.tag` (scmdb.net) con
+  `blueprint.blueprint_id` (sc-craft.tools) case-insensitive, memoizado en
+  `Crafting.blueprintByTagIndex()` — mismo criterio que
+  `DATA.missionsForCraftBlueprint()` en `js/data.js`, pero en sentido inverso
+  (de producto a plano). Si hay receta local, `renderObjectDetail()` reutiliza
+  `renderDetail()` tal cual (misma ficha completa que en modo Materiales); si
+  no (~8 de 1597), ficha mínima con lo que sí trae scmdb.net + sus misiones
+  vía `DATA.missionsForProduct()` — sin inventar ingredientes.
+- Cualquier ficha de objeto crafteable (llegue por material o por objeto) trae
+  además la tabla "Misiones que recompensan este objeto"
+  (`Crafting.missionsSectionHtml()`, fuente scmdb.net vía
+  `DATA.missionsForCraftBlueprint()`/`missionsForProduct()`) — DISTINTA de la
+  tabla preexistente "Misiones que sueltan este plano" (fuente sc-craft.tools,
+  `bp.missions`, sin id de misión con el que enlazar). Cada fila de la nueva
+  tabla trae un botón "Ver misión →" que llama a `Missions.show(m.id)` — ver
+  sección de abajo.
+
+## Pestaña Misiones (`js/missions.js`)
+
+Catálogo de contratos de scmdb.net (`data/missions.json`, ver
+`DATA.missionsList()`/`missionById()` en `js/data.js` y
+`.claude/guides/datos-juego.md` para el formato en disco). Mismo patrón de
+vista que el resto: objeto literal `Missions` con `init()`/`render*()`,
+filtros como propiedades de estado, sin clases ni módulos ES.
+
+**Filtros** (`Missions.matches(m)`): texto libre (título+descripción+facción+
+tipo), categoría y sistema como chips (`Missions.renderButtonFilter()`,
+reutilizable, mismo patrón que `#system-filter` de Ubicaciones), tipo de
+misión y facción como `<select>` (23 y 24 valores reales — demasiados para
+chips), legalidad/compartible/disponibilidad como chips de 3 estados, "solo
+con recompensa de plano" (checkbox, mismo marcado `.inv-cat-check` que
+Inventario) y rango de recompensa UEC (dos `<input type="number">`). Lista
+ordenable por recompensa/título/facción, criterio en
+`localStorage["mineriasc_missions_sort"]`.
+
+**API pública — `Missions.show(id)`**: único punto de entrada para saltar a
+esta pestaña desde otra vista (hoy solo Crafteo, ver arriba). Limpia los
+filtros primero (si no, una búsqueda o filtro activo podría dejar la misión de
+destino fuera de la lista visible aunque su ficha sí se abra), llama a
+`activateTab("misiones")` — función GLOBAL definida en `js/app.js` fuera de la
+IIFE de arranque, extraída del listener de clic de las pestañas precisamente
+para que saltos programáticos como este la reutilicen en vez de duplicar la
+lógica de "qué pestaña está activa" — y abre la ficha con `select(id)`.
+
+**Degradación**: si `data/missions.json` no cargó, `DATA.missions.ready` queda
+`false` (mismo contrato que `DATA.craft.ready`) y `Missions.init()` llama a
+`renderUnavailable()` — controles deshabilitados, mensaje de estado, resto de
+la app intacta. El modo "Objetos" de Crafteo degrada en paralelo sin ningún
+código adicional: `DATA.missionProducts()` devuelve `[]`, así que
+`Crafting.renderObjects()` muestra "Catálogo de objetos no disponible" y el
+`<select>` de categoría queda solo con "Todas (0)" — el modo "Materiales" no
+se ve afectado (solo desaparece la sección de misiones cruzadas de su ficha,
+que ya comprueba longitud 0 antes de renderizar).
+
 ## Página hermana: `contadores.html`
 
 El sitio tiene una segunda página estática, independiente de la de arriba: temporizadores
@@ -394,6 +473,21 @@ python .claude/scripts/browser_check.py --path index.html \
     }
     return document.querySelectorAll('#refinery-methods .stars').length; })()"
 ```
+
+**Trampa de `--wait` contra `DATA.raw`/flags "false por defecto"**: `DATA.raw !== null`
+se cumple nada más resolverse el PRIMER fetch de `DATA.load()` (`data/mining_data.json`),
+mucho antes de que terminen los fetches posteriores de `craft_blueprints.json`/
+`missions.json` y de que `app.js` llame a `Missions.init()`/`Crafting.init()` — un
+`--wait "DATA.raw !== null"` deja que los `--eval` siguientes corran contra una app a
+medio arrancar, y como flags como `DATA.missions.ready` empiezan en `false` TANTO "aún
+cargando" COMO "cargó y falló", un resultado `false` inesperado no distingue una cosa de
+otra (detectado probando la degradación sin `data/missions.json`: los primeros `--eval`
+veían el HTML estático sin tocar, y una llamada manual a la MISMA función que ya se
+suponía ejecutada funcionaba bien — la función nunca estuvo rota, solo aún no se había
+llamado). Espera algo que solo cambia al FINAL de `main()` en `js/app.js`, p. ej.
+`document.getElementById('craft-materials').children.length > 0` (se rellena en el mismo
+`Crafting.init()` que corre justo después de `Missions.init()`, exista o no
+`data/missions.json`).
 
 Ejemplo real (usado para verificar que `marketplaceAveragesAll` sirve datos):
 
