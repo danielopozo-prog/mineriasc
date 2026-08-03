@@ -51,16 +51,12 @@ const FINDER_SORT_LABELS = {
 
 // Valor numérico para ordenar por un criterio no alfabético. null = "sin
 // dato" (nunca se inventa un valor) — Finder.renderList() manda esos al
-// final de la lista, cualquiera que sea el criterio.
+// final de la lista, cualquiera que sea el criterio. El criterio "p2p" NO
+// pasa por aquí — tiene su propia función (finderP2pBest) y su propio
+// comparador en renderList(), porque no es un único número (ver abajo).
 //   - "refined": DATA.uexRefinedFor(oreKey).price_sell — precio UEX del
 //     mineral YA refinado (una commodity distinta del bruto). No todo
 //     mineral tiene variante refinada (p.ej. Ice no se refina) -> null.
-//   - "p2p": mejor precio medio del Marketplace P2P por SCU (nunca se
-//     mezcla con precios por unidad suelta/pack/caja — magnitudes
-//     distintas, ver comentario de marketplaceAvgFor en data.js). Los
-//     minerales que solo se trafican en unidades pequeñas (13 en el parche
-//     actual) no tienen fila "scu" -> null, no "inventar" convirtiendo su
-//     precio por unidad.
 //   - "rarity": DATA.rarityFor(oreKey).tier vía RARITY_ORDER (0=común …
 //     4=legendaria, ya definido en data.js) — null si mining_data.json no
 //     trae tier fiable para ese mineral.
@@ -69,15 +65,40 @@ function finderSortValue(oreKey, criterion) {
     const c = DATA.uexRefinedFor(oreKey);
     return c && c.price_sell > 0 ? c.price_sell : null;
   }
-  if (criterion === "p2p") {
-    const rows = DATA.marketplaceAvgFor(oreKey).filter((r) => r.unit === "scu");
-    return rows.length ? Math.max(...rows.map((r) => r.priceAvg)) : null;
-  }
   if (criterion === "rarity") {
     const r = DATA.rarityFor(oreKey);
     return r ? RARITY_ORDER[r.tier] : null;
   }
   return null;
+}
+
+// Mejor precio medio del Marketplace P2P para un mineral, SIN descartar las
+// unidades sueltas (pack/caja/docena/unidad...) — DATA.marketplaceAvgFor ya
+// trae esas filas con su `unit` real (ver contrato en data.js, parche 4.9):
+// el filtro `unit === "scu"` que tenía antes esta vista las descartaba sin
+// motivo real, dejando "sin datos P2P" a 13 minerales que SÍ tienen precio,
+// solo que no se trafican a granel por SCU (Carinite, Beradom, Hadanite...).
+// Devuelve { group: "scu"|"other", unit, price } o null si de verdad no hay
+// NINGUNA fila de marketplace para ese mineral (ICE/INERTMATERIAL en el
+// parche actual). `group` separa las dos magnitudes NO comparables (aUEC/SCU
+// frente a aUEC/unidad-suelta): prioriza SCU si existe (es la unidad de la
+// inmensa mayoría, 26 de 39 minerales) y solo cae a "other" si el mineral no
+// tiene ninguna fila "scu" — nunca mezcla ambas en un único número.
+function finderP2pBest(oreKey) {
+  const rows = DATA.marketplaceAvgFor(oreKey);
+  if (!rows.length) return null;
+  const scuRows = rows.filter((r) => r.unit === "scu");
+  const pool = scuRows.length ? scuRows : rows;
+  const best = pool.reduce((a, b) => (b.priceAvg > a.priceAvg ? b : a));
+  return { group: scuRows.length ? "scu" : "other", unit: best.unit, price: best.priceAvg };
+}
+
+// Etiqueta corta de unidad para el texto compacto de subLabelFor — reutiliza
+// UNIT_ES salvo "unit", que ahí se traduce a "unidad" (para la tabla de
+// detalle, con más sitio) pero aquí se abrevia a "ud" para no desbordar la
+// fila de la lista lateral.
+function finderUnitShortLabel(unit) {
+  return unit === "unit" ? "ud" : UNIT_ES[unit] || unit;
 }
 
 const Finder = {
@@ -125,6 +146,20 @@ const Finder = {
 
     if (this.sortBy === "alpha") {
       entries.sort((a, b) => a[1].display_name.localeCompare(b[1].display_name));
+    } else if (this.sortBy === "p2p") {
+      // Dos bloques, no un ranking único: aUEC/SCU y aUEC/unidad-suelta no
+      // son magnitudes comparables (ver finderP2pBest). Primero todos los
+      // "scu" (descendente), luego todos los "other" (descendente entre
+      // ellos), y al final los que de verdad no tienen ningún dato.
+      entries.sort((a, b) => {
+        const pa = finderP2pBest(a[0]);
+        const pb = finderP2pBest(b[0]);
+        const ra = pa ? (pa.group === "scu" ? 0 : 1) : 2;
+        const rb = pb ? (pb.group === "scu" ? 0 : 1) : 2;
+        if (ra !== rb) return ra - rb;
+        if (ra === 2) return a[1].display_name.localeCompare(b[1].display_name);
+        return pb.price - pa.price;
+      });
     } else {
       // Descendente por defecto en criterios numéricos (precio/rareza más
       // alta primero); sin dato -> al final, empatando por nombre.
@@ -165,8 +200,8 @@ const Finder = {
       return DATA.uexReady ? "sin refinado" : "cargando…";
     }
     if (this.sortBy === "p2p") {
-      const rows = DATA.marketplaceAvgFor(oreKey).filter((r) => r.unit === "scu");
-      if (rows.length) return `${fmtNum(Math.max(...rows.map((r) => r.priceAvg)))} aUEC (P2P)`;
+      const info = finderP2pBest(oreKey);
+      if (info) return `${fmtNum(info.price)} aUEC/${finderUnitShortLabel(info.unit)} (P2P)`;
       return DATA.marketplaceReady ? "sin datos P2P" : "cargando…";
     }
     if (this.sortBy === "rarity") {

@@ -214,8 +214,14 @@ def main():
     finder_js_src = (ROOT / "js" / "finder.js").read_text(encoding="utf-8")
     check("finder.js: finderSortValue definido (criterios de orden)", "function finderSortValue" in finder_js_src)
     check("finder.js: criterio 'refined' usa DATA.uexRefinedFor", "DATA.uexRefinedFor(oreKey)" in finder_js_src)
-    check("finder.js: criterio 'p2p' usa DATA.marketplaceAvgFor filtrando unit==='scu' (no mezcla unidades)",
-          re.search(r"criterion === \"p2p\"[\s\S]{0,200}unit === \"scu\"", finder_js_src) is not None)
+    check("finder.js: finderP2pBest no descarta unidades sueltas (usa TODAS las filas de marketplaceAvgFor)",
+          "function finderP2pBest" in finder_js_src
+          and re.search(r"function finderP2pBest[\s\S]{0,300}const pool = scuRows\.length \? scuRows : rows",
+                         finder_js_src) is not None)
+    check("finder.js: precio P2P separa SCU y unidad suelta en bloques, no los mezcla en un ranking",
+          re.search(r"ra !== rb\)\s*return ra - rb", finder_js_src) is not None)
+    check("finder.js: subLabelFor muestra la unidad real del precio P2P (no siempre SCU)",
+          "aUEC/${finderUnitShortLabel(info.unit)}" in finder_js_src)
     check("finder.js: criterio 'rarity' usa RARITY_ORDER", "RARITY_ORDER[r.tier]" in finder_js_src)
     check("finder.js: valores sin dato van al final del orden (nunca se inventan)",
           re.search(r"if \(va == null\) return 1", finder_js_src) is not None)
