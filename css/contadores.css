@@ -62,32 +62,51 @@
 :root{
   /* Alineadas con las variables de css/styles.css (mismo --bg/--panel/--accent
      que el resto de Minería SC); --accent y --accent-2 ya coincidían al
-     milímetro porque ambos proyectos parten de la misma referencia yokais.es. */
+     milímetro porque ambos proyectos parten de la misma referencia yokais.es.
+     Coherencia con el restyle "terminal/consola militar" de css/styles.css
+     (misma paleta medida — ver el comentario largo junto al :root de ese
+     archivo para el porqué de cada valor, no repetido aquí): esta página
+     hermana solo actualiza VALORES de sus propias custom properties, ya
+     nombradas distinto (--ink/--muted/--line...) pero con el mismo rol que
+     --text/--text-dim/--border-muted allí. Se conserva su identidad propia
+     de esquinas cortadas (clip-path, "--notch") en vez de aplanarlas a 0:
+     no son esquinas REDONDEADAS (lo que pide aplanar el encargo), son un
+     recurso HUD ya angular y coherente con el nuevo tono — cambiarlo sería
+     una reestructuración visual mayor, fuera de lo pedido ("coherencia", no
+     "igualar"). --dim se queda en el apagado #6b5754 de la referencia (ya
+     lo usaba en un tono casi idéntico, #5c5757, y aquí SOLO decora etiquetas
+     diminutas de 8,5-11px o estados "inactivos" — nunca texto de lectura);
+     --muted sube al salmón #d3adaa (como --text-dim en css/styles.css) por
+     el mismo motivo de contraste: es el tono que sí se usa en texto legible
+     (subtítulos, notas). */
   --bg:#0a0a0a;
-  --panel:#161212;
-  --panel-2:#120e0e;
-  --line:rgba(237,237,237,.09);
-  --line-strong:rgba(216,31,43,.28);
+  --panel:#131010;
+  --panel-2:#0d0b0b;
+  --line:#7a3630;
+  --line-strong:rgba(216,31,43,.55);
 
   --ink:#ededed;
-  --muted:#8a8a8a;
-  --dim:#5c5757;
+  --muted:#d3adaa;
+  --dim:#6b5754;
 
   --accent:#d81f2b;
-  --accent-2:#ff6a3d;
+  --accent-2:#ef8d88;
   --ok:#4cd97b;
   --ok-dim:#1f5c39;
   --warn:#fcbb00;
-  --info:#4da3ff;
+  --info:#4fd8d0;
 
   --glow:0 0 10px rgba(216,31,43,.7);
   --glow-ok:0 0 10px rgba(76,217,123,.6);
 
   /* Sin Inter (no vendorizada): el cuerpo cae al mismo stack de sistema que
-     usa css/styles.css en vez de tirar de una fuente de Google adicional. */
+     usa css/styles.css en vez de tirar de una fuente de Google adicional.
+     --f-alt (labels/botones/UI, antes Saira Condensed) pasa a mono, igual
+     que --font-ui en css/styles.css; --f-title (Teko, títulos/relojes
+     grandes) se conserva. */
   --f-title:"Teko","Segoe UI",system-ui,sans-serif;
-  --f-alt:"Saira Condensed","Segoe UI",system-ui,sans-serif;
-  --f-body:"Segoe UI",system-ui,sans-serif;
+  --f-alt: ui-monospace, "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+  --f-body: ui-monospace, "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
 
   --notch:14px;
   /* Coherente con el max-width de css/styles.css (Minería SC): más ancho en

@@ -54,15 +54,59 @@ El orden importa: cada módulo asume que los anteriores existen como globales.
   ordenado descendente, `[]` si no hay dato. Ambos son síncronos y están disponibles
   justo tras `await DATA.load()` (dato 100% local, sin dependencia de la API en vivo de
   UEX) — detalle de la fuente y sus huecos en `.claude/guides/datos-juego.md`.
-- Sistema visual (`css/styles.css`): tema negro casi puro (`--bg: #0a0a0a`) con acento
-  rojo carmesí (`--accent: #d81f2b`, sustituye al ámbar histórico) y acento secundario
-  naranja (`--accent-2`) para kickers de sección (`.kicker`, texto pequeño en mayúsculas
-  tipo "STAR CITIZEN · ..."). Titulares (`.brand h1`, `.panel-head h2`, `.detail h3/h4`)
-  usan `--font-display` (Teko); controles/tablas usan `--font-ui` (Saira Condensed).
-  Ambas fuentes están vendorizadas como `.woff2` en `assets/fonts/` con `@font-face` —
-  nunca CDN de Google Fonts (el gate lo comprueba en `index.html` y `css/styles.css`).
-  Los paneles `.detail` llevan esquinas HUD (pseudo-elementos `::before`/`::after` con
-  borde rojo) como detalle decorativo sutil.
+- **Sistema visual — "terminal/consola militar"** (`css/styles.css`): restyle a partir
+  de tokens medidos en el DOM de una herramienta interna de referencia
+  (yokais.es/herramientas/star-citizen-fps). Negro casi puro (`--bg: #0a0a0a`), paneles
+  `#0d0b0b`/`#131010` con borde 1px SÓLIDO ladrillo apagado (`--border-muted: #7a3630`,
+  ya no translúcido) y **radio 0 en todo** (`--radius`/`--radius-sm: 0`, incluidas las
+  pastillas/chips que antes eran `border-radius: 20px` — solo quedan redondos los puntos
+  de estado tipo LED: `.rarity-dot`, `.phase__dot`/`.chip` de contadores.css). Acento
+  primario rojo vivo (`--accent: #d81f2b`, títulos de sección/estados activos/alertas);
+  `--accent-2` REDEFINIDO a salmón claro de énfasis (`#ef8d88`, antes naranja
+  `#ff6a3d` — mismo rol de "acento secundario/resaltado" en ~15 sitios, favoritos,
+  etiquetas de grupo…, así que cambiar el valor bastó); `--text-dim` REDEFINIDO a
+  salmón desaturado (`#d3adaa`, antes gris `#8a8a8a`) para TODO texto secundario
+  legible (hints, labels, subtítulos) — el "apagado" que también dio la referencia
+  (`#6b5754`) mide ~2,94:1 de contraste sobre `--bg` (por debajo de AA 4.5:1), así que
+  se reserva a `--text-muted` para elementos no textuales/decorativos, nunca para texto
+  de lectura (detalle completo, con los números de contraste, en el comentario del
+  `:root` de `css/styles.css`). `--info` retinta a cian (`#4fd8d0`, antes azul) y hay
+  `--warn` nuevo (ámbar `#fcbb00`, aplicado a las filas de "pocos anuncios" del
+  Marketplace P2P — antes solo atenuadas con opacidad). `--good` (verde menta) ya
+  estaba correcto y ahora también colorea `.stat .value.accent`/`.inv-box-meta .accent`
+  (SIEMPRE precios en esta app, verificado contra los 3 sitios donde JS emite esa
+  clase — "precios en verde" sin tocar JS). Botón fantasma (`.btn.small`, la mayoría de
+  botones) con tokens propios `--btn-ghost-bg`/`--btn-ghost-border`; primario (`.btn`:
+  Añadir, Actualizar) en rojo.
+  Controles/labels/botones en `--font-ui`, ahora monoespaciada (`ui-monospace,
+  SFMono-Regular, Consolas, monospace` — stack de sistema, sin vendorizar nada nuevo);
+  `--font-num` (cifras densas: matriz de señales, múltiplos) se unificó con `--font-ui`
+  porque una mono ya da alineación tabular por diseño. Titulares grandes (`.brand h1`,
+  `.panel-head h2`, `.detail h3`) conservan `--font-display` (Teko + Saira Condensed de
+  fallback, ambas vendorizadas como `.woff2` en `assets/fonts/` con `@font-face` — nunca
+  CDN de Google Fonts, el gate lo comprueba en `index.html` y `css/styles.css`).
+  Cabeceras de sección en patrón `"[ Nombre ]"` (`.panel-head h2`, `.detail h4/h5`,
+  `#craft-list .craft-section-name`, `.inv-box-name`): `::before`/`::after` con
+  `content: "[ "`/`" ]"` **en línea con el texto, sin `display:flex` ni línea creciente
+  hasta el borde** — una primera versión SÍ usaba flex + un `::after` con `flex:1` y
+  `border-bottom` para simular la línea, pero se rompía en viewports estrechos (900px):
+  el pseudo-elemento, al ser un item de flex aparte, no sigue el flujo del texto cuando
+  este envuelve a 2 líneas y queda flotando suelto en su propia línea. Se prioriza que
+  nunca desborde/rompa sobre la fidelidad literal de "línea hasta el borde". `.card h5`
+  (fichas de refinería y de ingrediente en el simulador de calidad de Crafteo) se
+  excluye a propósito de este patrón (`display: block` + `content: none` en sus
+  pseudo-elementos): sin el reset heredaría los corchetes de `.detail h5` (ambas viven
+  dentro de un `.detail`), y el nombre del ingrediente + slot entre paréntesis puede
+  partirse en 2 líneas igual que el bug de arriba.
+  Los paneles `.detail` siguen llevando esquinas HUD (pseudo-elementos `::before`/
+  `::after` con borde rojo) como detalle decorativo, sin cambios.
+  `css/contadores.css` (página hermana) alinea sus propios tokens (`--line`, `--muted`,
+  `--dim`, `--info`, `--accent-2`) a los mismos valores por coherencia, pero CONSERVA su
+  identidad propia de esquinas cortadas (`clip-path`, `--notch`) en vez de aplanarlas a
+  0: no son esquinas redondeadas, son un recurso HUD ya angular — aplanarlas habría sido
+  una reestructuración visual mayor, fuera de "coherencia". Si se retoca `--dim`/`--info`
+  ahí, hay que actualizar también `FAVICON_TONES` en `js/contadores.js` (el gate lo
+  compara, ver más abajo).
 - Cada vista es un objeto literal con `init()` / `render*()`; estado en propiedades
   (`selected`, `groupBy`…). Sin clases, sin módulos ES.
 - Claves de `localStorage`: `mineriasc_inventory` (inventario), `mineriasc_uex_*`

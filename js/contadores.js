@@ -360,11 +360,11 @@ function renderHud(){
    coincidiendo con contadores.css si alguien retoca la paleta allí. */
 const FAVICON_TONES = {
   calm: '#4cd97b',  // --ok
-  mid:  '#4da3ff',  // --info
+  mid:  '#4fd8d0',  // --info (restyle "terminal": azul -> cian, ver css/contadores.css)
   warn: '#fcbb00',  // --warn
   hot:  '#d81f2b',  // --accent
   done: '#4cd97b',  // --ok (igual que .pill.p-done)
-  off:  '#5c5757',  // --dim
+  off:  '#6b5754',  // --dim (restyle "terminal": ver css/contadores.css)
 };
 
 let faviconCanvas = null, faviconCtx = null, faviconLink = null;

@@ -49,32 +49,74 @@
   src: url("../assets/fonts/saira-condensed-700.woff2") format("woff2");
 }
 
+/* ---------- Paleta "terminal/consola militar" ----------
+   Restyle a partir de tokens medidos en el DOM real de una herramienta interna
+   de referencia (yokais.es/herramientas/star-citizen-fps). Solo cambian los
+   VALORES de las custom properties que ya existían — la estructura HTML, el
+   layout y el JS no se tocan; casi toda la web hereda el look nuevo solo por
+   esto, sin más ediciones (ver comentarios puntuales más abajo para lo que sí
+   necesitó una regla nueva: cabeceras "[ ... ]", radios de pastilla, botón
+   fantasma). Decisiones de mapeo no triviales, documentadas para quien retoque
+   esto después:
+   - --text-dim se REDEFINE al salmón desaturado de la referencia (#d3adaa,
+     "jerarquía secundaria") en vez del apagado #6b5754 ("apagado") que
+     también dio la referencia: medido contra --bg, #6b5754 da ~2,94:1 de
+     contraste (por debajo de AA 4.5:1) — usarlo en texto legible (hints,
+     labels, subtítulos, que es donde --text-dim se usa en toda la app)
+     incumpliría el propio suelo de contraste que pide el encargo. #d3adaa
+     da ~9,74:1. El apagado real (--text-muted) se reserva para elementos NO
+     textuales/decorativos (carets, tier "común").
+   - --accent-2 se REDEFINE al salmón claro de énfasis (#ef8d88, ~8,3:1 de
+     contraste) en vez del naranja anterior (#ff6a3d): ya se usaba en toda la
+     app como "acento secundario/resaltado" (favoritos, etiquetas de grupo en
+     desplegables, badges de método "nave"...), que es justo el rol de
+     "énfasis salmón claro" de la referencia — cambiar el VALOR reutiliza esas
+     ~15 reglas ya existentes sin tocarlas una a una.
+   - --info se retinta a cian (antes azul #4da3ff): la referencia pide cian
+     para "acciones/toggles secundarios"; --info ya cubre esos casos
+     (enlaces del footer) y los "fríos" semánticos que hay que conservar
+     integrados (rareza "rara", método de minado "nave/ROC" — ver más abajo),
+     así que quedan igual de distinguibles del resto de acentos, solo que
+     cian en vez de azul.
+   - Nuevo --warn (ámbar): sin uso previo en la app — se aplica a las filas
+     de "pocos anuncios" del Marketplace P2P (antes solo atenuadas con
+     opacity), un caso real de "intermedio/aviso" que no tenía color propio.
+   - Nuevo --btn-ghost-bg/--btn-ghost-border para el botón fantasma
+     (.btn.small): la referencia da valores propios (#1c1210/#6b332f) que no
+     coinciden con --panel/--border-muted ya existentes. */
 :root {
   --bg: #0a0a0a;
-  --bg-alt: #120e0e;
-  --panel: #161212;
-  --panel-hover: #1e1818;
-  --border: rgba(216, 31, 43, 0.22);
-  --border-muted: #262020;
-  --border-strong: rgba(216, 31, 43, 0.45);
+  --bg-alt: #0d0b0b;
+  --panel: #131010;
+  --panel-hover: #1c1614;
+  --border: #7a3630;
+  --border-muted: #7a3630;
+  --border-strong: rgba(216, 31, 43, 0.55);
   --text: #ededed;
-  --text-dim: #8a8a8a;
+  --text-dim: #d3adaa;
+  --text-muted: #6b5754;
   --accent: #d81f2b;
   --accent-soft: rgba(216, 31, 43, 0.16);
-  --accent-2: #ff6a3d;
+  --accent-2: #ef8d88;
   --good: #4cd97b;
   --bad: #ff8a5c;
-  --info: #4da3ff;
-  --star-on: #ff6a3d;
-  --star-off: #5c2530;
-  --radius: 8px;
-  --radius-sm: 6px;
+  --warn: #fcbb00;
+  --info: #4fd8d0;
+  --star-on: var(--accent-2);
+  --star-off: #3f2422;
+  --btn-ghost-bg: #1c1210;
+  --btn-ghost-border: #6b332f;
+  --radius: 0;
+  --radius-sm: 0;
   --font-display: "Teko", "Saira Condensed", "Segoe UI", system-ui, sans-serif;
-  --font-ui: "Saira Condensed", "Segoe UI", system-ui, sans-serif;
-  /* Para cifras densas (matriz de señales, múltiplos): la condensada Teko/Saira
-     es difícil de leer dígito a dígito cuando hay muchos números juntos. Se
-     usa el mismo stack sans del cuerpo, siempre con tabular-nums al lado. */
-  --font-num: "Segoe UI", system-ui, sans-serif;
+  /* Cuerpo/controles a monoespaciada (stack de sistema, sin CDN ni fuente
+     nueva que vendorizar): labels, botones, listas y valores. --font-display
+     (Teko) se conserva para h1/h2 grandes, tal como permite el encargo. */
+  --font-ui: ui-monospace, "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+  /* Antes un sans aparte para cifras densas (matriz de señales, múltiplos):
+     una monoespaciada ya da alineación tabular por diseño, así que se
+     unifica con --font-ui en vez de mantener un tercer stack. */
+  --font-num: var(--font-ui);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -82,7 +124,7 @@
 body {
   background: radial-gradient(ellipse at top, #150a0a 0%, var(--bg) 55%);
   color: var(--text);
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -96,7 +138,7 @@ body {
   font-weight: 600;
   letter-spacing: 2.5px;
   text-transform: uppercase;
-  color: var(--accent-2);
+  color: var(--accent); /* rojo vivo, igual que .eyebrow en contadores.css (mismo rol de "kicker") */
   margin-bottom: 2px;
 }
 
@@ -136,14 +178,14 @@ body {
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-dim);
-  padding: 8px 16px;
+  padding: 8px 14px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: 0.82rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 2px;
   transition: all 0.15s;
 }
 .tab:hover { color: var(--text); background: var(--panel); }
@@ -167,13 +209,34 @@ main { flex: 1; padding: 20px 24px; max-width: 1600px; width: 100%; margin: 0 au
   gap: 12px;
   margin-bottom: 16px;
 }
-.head-title { display: flex; flex-direction: column; gap: 2px; }
+/* flex:1 (nuevo): antes head-title solo ocupaba su ancho de contenido; con
+   esto reclama el hueco libre de la fila (hasta donde empiece
+   .panel-head-actions o, si no hay, hasta el borde derecho) — sin eso la
+   línea de la cabecera "[ NOMBRE ]───" de abajo no tendría espacio real
+   donde extenderse. min-width:0 de rigor en un hijo flex con texto/línea
+   que no debe forzar el ancho del padre. */
+.head-title { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 /* Búsqueda/filtro + control de ordenación agrupados a la derecha del
    panel-head (Buscador, Ubicaciones, Crafteo): mismo flex-wrap que el propio
    panel-head, así que en pantallas estrechas el select de orden simplemente
    baja de línea en vez de desbordar. */
 .panel-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .panel-head-actions select { min-width: 0; }
+/* Cabecera de sección "[ NOMBRE ]────────": corchetes con ::before (fijo,
+   junto al texto) y ::after (crece con flex:1 hasta el borde derecho de
+   head-title, con su propio border-bottom haciendo de línea — así "]"
+   queda pegado al título y la línea continúa sola hasta el final). El
+   título grande sigue en --font-display (Teko); los corchetes/línea van en
+   --font-ui (mono), más discretos. */
+/* Corchetes "[ Nombre ]" en línea con el texto (::before/::after simples,
+   SIN flex ni línea creciente hasta el borde): la primera versión usaba
+   display:flex + un ::after con flex:1 para simular la línea "hasta el
+   borde derecho" del encargo, pero se rompía en cuanto el título envolvía a
+   2 líneas en viewports estrechos (el ::after, al ser un item de flex
+   aparte, no sigue el flujo del texto que envuelve y queda flotando suelto
+   en una línea propia). Se prioriza que NUNCA desborde/rompa sobre la
+   fidelidad literal de "línea hasta el borde" — ver detalle en
+   arquitectura.md. */
 .panel-head h2 {
   font-family: var(--font-display);
   font-size: 1.5rem;
@@ -181,6 +244,18 @@ main { flex: 1; padding: 20px 24px; max-width: 1600px; width: 100%; margin: 0 au
   text-transform: uppercase;
   letter-spacing: -0.3px;
   color: var(--accent);
+}
+.panel-head h2::before {
+  content: "[ ";
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--border-muted);
+}
+.panel-head h2::after {
+  content: " ]";
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--border-muted);
 }
 .hint { color: var(--text-dim); font-size: 0.8rem; }
 
@@ -349,7 +424,7 @@ input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--accent-2);
+  color: var(--accent); /* cabecera de sección: rojo vivo, igual que .panel-head h2/.detail h4 */
   background: var(--panel);
   border: none;
   border-bottom: 1px solid var(--border-muted);
@@ -432,27 +507,35 @@ button.side-group-head:hover { background: var(--panel-hover); }
   margin-bottom: 4px;
 }
 .detail .subtitle { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 16px; }
+/* Mismo patrón "[ Nombre ]" que .panel-head h2 (sin flex ni línea creciente
+   — ver el comentario largo junto a esa regla sobre por qué: no aguanta el
+   texto envolviendo a 2 líneas en paneles estrechos). */
 .detail h4 {
   margin: 20px 0 8px;
   font-family: var(--font-ui);
   font-size: 0.85rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
   color: var(--accent);
 }
+.detail h4::before { content: "[ "; color: var(--border-muted); letter-spacing: 0; }
+.detail h4::after { content: " ]"; color: var(--border-muted); letter-spacing: 0; }
 /* Sub-cabecera dentro de una sección h4 (p.ej. separar "por SCU" de "por
    unidad de venta" en el marketplace de un mineral): más discreta que h4,
-   que ya marca el bloque grande con el color de acento. */
+   que ya marca el bloque grande con el color de acento — mismo patrón de
+   corchetes, más pequeño y apagado. */
 .detail h5 {
   margin: 14px 0 6px;
   font-family: var(--font-ui);
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   color: var(--text-dim);
 }
+.detail h5::before { content: "[ "; color: var(--border-muted); letter-spacing: 0; }
+.detail h5::after { content: " ]"; color: var(--border-muted); letter-spacing: 0; }
 
 .stat-grid {
   display: grid;
@@ -469,13 +552,17 @@ button.side-group-head:hover { background: var(--panel-hover); }
 .stat .value { font-size: 1.05rem; font-weight: 600; margin-top: 2px; }
 .stat .value.good { color: var(--good); }
 .stat .value.bad { color: var(--bad); }
-.stat .value.accent { color: var(--accent); }
+/* .value.accent SIEMPRE es un precio en esta app (Finder: precio refinado;
+   Inventario: valor estimado) — nunca se usa para otra cosa, comprobado
+   contra los 3 puntos donde JS emite esta clase. Verde per "precios en
+   verde" del encargo, sin tocar JS (no hace falta renombrar la clase). */
+.stat .value.accent { color: var(--good); }
 
 /* ---------- Tags / pills ---------- */
 .pill {
   display: inline-block;
   padding: 3px 10px;
-  border-radius: 20px;
+  border-radius: 0;
   font-family: var(--font-ui);
   font-size: 0.75rem;
   background: var(--panel);
@@ -536,7 +623,10 @@ tr:nth-child(even) td { background: rgba(22, 18, 18, 0.5); }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
 td.good { color: var(--good); }
 td.bad { color: var(--bad); }
-tr.low-confidence td { opacity: 0.55; }
+/* Pocos anuncios = dato poco fiable, ni "bueno" ni "malo": caso real de
+   "intermedio/aviso" que antes solo se marcaba con opacidad — ahora también
+   en ámbar, como pide el encargo para esos casos. */
+tr.low-confidence td { opacity: 0.75; color: var(--warn); }
 tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
 
 /* ---------- Cards ---------- */
@@ -552,7 +642,15 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
   border-radius: var(--radius);
   padding: 14px;
 }
+/* display:block + sin pseudo-elementos, a propósito: .card puede vivir
+   dentro de #craft-detail (fichas del simulador de calidad de Crafteo), que
+   es un .detail — sin este reset, .card h5 heredaría el flex/corchetes de
+   ".detail h5" de más abajo, pensado para una sola línea corta; el nombre
+   del ingrediente + slot entre paréntesis puede partirse en 2 líneas y el
+   corchete de cierre (con su línea) quedaba mal colocado, flotando sobre la
+   segunda línea en vez de pegado al final del texto. */
 .card h5 {
+  display: block;
   font-family: var(--font-ui);
   font-size: 0.95rem;
   font-weight: 600;
@@ -561,6 +659,7 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
   margin-bottom: 6px;
   color: var(--accent);
 }
+.card h5::before, .card h5::after { content: none; }
 .card .row { display: flex; justify-content: space-between; font-size: 0.8rem; padding: 2px 0; color: var(--text-dim); }
 .card .row b { color: var(--text); }
 
@@ -638,6 +737,10 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
   gap: 1px;
   min-width: 0;
 }
+/* Corchetes "[ Nombre ]" alrededor del nombre de sección — la línea que
+   "se extiende hasta el borde derecho" ya la pone el border-bottom que
+   .side-group-head tiene de por sí (cabecera de fila completa), así que
+   aquí basta con los corchetes, sin flex:1/línea propia. */
 #craft-list .craft-section-name {
   font-family: var(--font-ui);
   font-size: 0.95rem;
@@ -646,6 +749,8 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
   letter-spacing: normal;
   color: var(--text);
 }
+#craft-list .craft-section-name::before { content: "[ "; color: var(--border-muted); }
+#craft-list .craft-section-name::after { content: " ]"; color: var(--border-muted); }
 #craft-list .craft-section-count {
   font-family: var(--font-ui);
   font-size: 0.68rem;
@@ -672,10 +777,12 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
 .craft-filter-label { font-family: var(--font-ui); font-size: 0.75rem; color: var(--text-dim); }
 .craft-filter-chip {
   padding: 3px 12px;
-  border-radius: 20px;
+  border-radius: 0;
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
   background: var(--panel);
   border: 1px solid var(--border-muted);
   color: var(--text-dim);
@@ -685,33 +792,38 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
 .craft-filter-chip:hover { background: var(--panel-hover); }
 .craft-filter-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
-/* ---------- Buttons ---------- */
+/* ---------- Buttons ----------
+   Primario (.btn: AÑADIR, ACTUALIZAR...) en rojo vivo, tal como pide el
+   encargo. Fantasma (.btn.small: la inmensa mayoría — Por mineral/Por
+   ubicación, Exportar, filtros de sistema...) con los tokens medidos de la
+   referencia (--btn-ghost-bg/--btn-ghost-border, texto --accent-2). */
 .btn {
   display: inline-block;
   background: var(--accent);
   color: #180505;
-  border: none;
+  border: 1px solid var(--accent);
   padding: 9px 18px;
   border-radius: var(--radius-sm);
   font-family: var(--font-ui);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 2px;
   text-decoration: none;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 .btn:hover { filter: brightness(1.15); }
 .btn.small {
-  background: rgba(216, 31, 43, 0.2);
-  color: var(--accent);
-  border: 1px solid rgba(216, 31, 43, 0.4);
+  background: var(--btn-ghost-bg);
+  color: var(--accent-2);
+  border: 1px solid var(--btn-ghost-border);
   padding: 7px 14px;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 600;
+  letter-spacing: 2px;
 }
-.btn.small:hover { background: rgba(216, 31, 43, 0.32); border-color: var(--accent); }
-.btn.small.active { background: rgba(216, 31, 43, 0.35); border-color: var(--accent); color: var(--text); }
+.btn.small:hover { background: var(--panel-hover); border-color: var(--accent-2); }
+.btn.small.active { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
 .btn.small.danger:hover { border-color: var(--bad); color: var(--bad); background: rgba(255, 138, 92, 0.12); }
 .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
 
@@ -753,7 +865,9 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
   padding: 7px 12px;
   cursor: pointer;
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
   user-select: none;
 }
 .inv-cat-check:hover { border-color: var(--border-strong); }
@@ -821,12 +935,27 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
   color: var(--text);
 }
 .inv-box-head:hover { background: var(--panel-hover); }
+/* Corchetes "[ Nombre ]" — línea "hasta el borde" ya cubierta por el
+   border-bottom que trae .inv-box-body/el propio recuadro de la caja
+   (mismo criterio que #craft-list .craft-section-name). */
 .inv-box-name {
   font-family: var(--font-display);
   font-size: 1.3rem;
   font-weight: 600;
   letter-spacing: 0.3px;
   line-height: 1.1;
+}
+.inv-box-name::before {
+  content: "[ ";
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  color: var(--border-muted);
+}
+.inv-box-name::after {
+  content: " ]";
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  color: var(--border-muted);
 }
 .inv-box-meta {
   display: flex;
@@ -835,7 +964,7 @@ tr.unidentified-ore td { opacity: 0.5; font-style: italic; }
   font-size: 0.78rem;
   color: var(--text-dim);
 }
-.inv-box-meta .accent { color: var(--accent); font-weight: 600; }
+.inv-box-meta .accent { color: var(--good); font-weight: 600; } /* precio (valor de la caja) — ver nota junto a .stat .value.accent */
 .inv-box-caret { color: var(--text-dim); }
 .inv-box-body { border-top: 1px solid var(--border-muted); }
 .inv-box-body[hidden] { display: none; }
@@ -1286,7 +1415,7 @@ footer a { color: var(--info); text-decoration: none; }
 .sig-loc-method-badge {
   display: inline-block;
   padding: 1px 8px;
-  border-radius: 20px;
+  border-radius: 0;
   font-family: var(--font-ui);
   font-size: 0.65rem;
   font-weight: 700;
@@ -1312,10 +1441,12 @@ footer a { color: var(--info); text-decoration: none; }
 }
 .sig-loc-method-filter {
   padding: 3px 12px;
-  border-radius: 20px;
+  border-radius: 0;
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
   background: var(--panel);
   border: 1px solid var(--border-muted);
   color: var(--text-dim);
